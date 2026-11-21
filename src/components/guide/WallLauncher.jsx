@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useLocation } from "react-router-dom";
 import { useGuide } from "../../context/GuideContext";
+import { useAuth } from "../../context/AuthContext";
 import WallMascot from "./WallMascot";
 import {
   Sparkles,
@@ -12,7 +14,6 @@ import {
   Play,
   RotateCcw,
   CheckCircle2,
-  HelpCircle,
   Volume2,
   VolumeX,
   Lightbulb,
@@ -21,9 +22,29 @@ import {
   Sliders,
   CreditCard,
   Keyboard,
+  GripVertical,
+  Move,
 } from "lucide-react";
 
+const STORAGE_POS_KEY = "vault_wally_launcher_position_v1";
+const SAFE_MARGIN = 16;
+
+// Module-scoped active singleton tracking to strictly ensure only ONE Wally launcher can ever mount/render
+let activeLauncherInstanceId = null;
+
+// Calculate current element dimensions safely (unaffected by CSS transform scale)
+const getButtonDimensions = (el) => {
+  const isMobile = typeof window !== "undefined" && window.innerWidth < 480;
+  return {
+    width: el?.offsetWidth || (isMobile ? 56 : 180),
+    height: el?.offsetHeight || 52,
+  };
+};
+
 export default function WallLauncher() {
+  const { user } = useAuth();
+  const location = useLocation();
+
   const {
     tours,
     startTour,
@@ -34,7 +55,211 @@ export default function WallLauncher() {
     toggleSound,
   } = useGuide();
 
+  // Strict Singleton Guard: guarantee only one instance of Wally Launcher ever renders
+  const instanceIdRef = useRef(null);
+  if (!instanceIdRef.current) {
+    instanceIdRef.current = Math.random().toString(36).slice(2, 9);
+  }
+
+  const [isPrimaryInstance, setIsPrimaryInstance] = useState(() => {
+    if (!activeLauncherInstanceId) {
+      activeLauncherInstanceId = instanceIdRef.current;
+      return true;
+    }
+    return activeLauncherInstanceId === instanceIdRef.current;
+  });
+
+  useEffect(() => {
+    if (!activeLauncherInstanceId || activeLauncherInstanceId === instanceIdRef.current) {
+      activeLauncherInstanceId = instanceIdRef.current;
+      setIsPrimaryInstance(true);
+    } else {
+      setIsPrimaryInstance(false);
+    }
+
+    return () => {
+      if (activeLauncherInstanceId === instanceIdRef.current) {
+        activeLauncherInstanceId = null;
+      }
+    };
+  }, []);
+
   const [isOpen, setIsOpen] = useState(false);
+  // null means anchored to default bottom-right corner (right: 16px, bottom: 16px)
+  const [position, setPosition] = useState(null);
+  const [isDragging, setIsDragging] = useState(false);
+
+  const buttonRef = useRef(null);
+  const currentPosRef = useRef(null);
+  const isDraggingRef = useRef(false);
+  const hasMovedRef = useRef(false);
+  const startPointerRef = useRef({ x: 0, y: 0 });
+  const startPosRef = useRef({ x: 0, y: 0 });
+  const justDraggedRef = useRef(false);
+
+  // Only show Wally on authenticated workspace pages (e.g. /dashboard, /profile, /users, /billing, /tutorials, etc.)
+  // Hide on public landing page, authentication screens, or when logged out
+  const isPublicRoute =
+    !user ||
+    location.pathname === "/" ||
+    location.pathname === "/login" ||
+    location.pathname === "/register" ||
+    location.pathname === "/reset-password" ||
+    location.pathname.startsWith("/share") ||
+    location.pathname.startsWith("/shared-access") ||
+    location.pathname.startsWith("/s/") ||
+    location.pathname === "/privacy" ||
+    location.pathname === "/terms" ||
+    location.pathname === "/security";
+
+  // Clear any legacy persisted coordinates on mount and reset to default bottom-right when first appearing
+  useEffect(() => {
+    try {
+      localStorage.removeItem(STORAGE_POS_KEY);
+    } catch {}
+    setPosition(null);
+    currentPosRef.current = null;
+  }, [isPublicRoute]);
+
+  // Keep ref synchronized with position state
+  useEffect(() => {
+    currentPosRef.current = position;
+  }, [position]);
+
+  // Window resize listener: automatically clamp custom dragged position so Wally is never cropped or pushed offscreen
+  useEffect(() => {
+    const handleResize = () => {
+      setPosition((prev) => {
+        if (!prev) return null;
+        const { width, height } = getButtonDimensions(buttonRef.current);
+        const margin = window.innerWidth < 480 ? 10 : SAFE_MARGIN;
+        const maxX = Math.max(margin, window.innerWidth - width - margin);
+        const maxY = Math.max(margin, window.innerHeight - height - margin);
+
+        const clampedX = Math.max(margin, Math.min(maxX, prev.x));
+        const clampedY = Math.max(margin, Math.min(maxY, prev.y));
+
+        if (clampedX !== prev.x || clampedY !== prev.y) {
+          const next = { x: clampedX, y: clampedY };
+          currentPosRef.current = next;
+          return next;
+        }
+        return prev;
+      });
+    };
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  // Pointer drag handlers
+  const handlePointerDown = (e) => {
+    if (e.button !== 0 && e.pointerType === "mouse") return;
+
+    isDraggingRef.current = true;
+    hasMovedRef.current = false;
+    startPointerRef.current = { x: e.clientX, y: e.clientY };
+
+    if (currentPosRef.current) {
+      startPosRef.current = { x: currentPosRef.current.x, y: currentPosRef.current.y };
+    } else {
+      const el = buttonRef.current;
+      const { width, height } = getButtonDimensions(el);
+      const margin = window.innerWidth < 480 ? 10 : SAFE_MARGIN;
+      const rect = el?.getBoundingClientRect();
+      startPosRef.current = {
+        x: rect && rect.width > 0 ? rect.left : Math.max(margin, window.innerWidth - width - margin),
+        y: rect && rect.height > 0 ? rect.top : Math.max(margin, window.innerHeight - height - margin),
+      };
+    }
+
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {}
+  };
+
+  const handlePointerMove = (e) => {
+    if (!isDraggingRef.current) return;
+
+    const dx = e.clientX - startPointerRef.current.x;
+    const dy = e.clientY - startPointerRef.current.y;
+
+    if (!hasMovedRef.current) {
+      if (Math.hypot(dx, dy) > 4) {
+        hasMovedRef.current = true;
+        setIsDragging(true);
+      } else {
+        return;
+      }
+    }
+
+    const { width, height } = getButtonDimensions(buttonRef.current);
+    const margin = window.innerWidth < 480 ? 10 : SAFE_MARGIN;
+    const minX = margin;
+    const maxX = Math.max(margin, window.innerWidth - width - margin);
+    const minY = margin;
+    const maxY = Math.max(margin, window.innerHeight - height - margin);
+
+    const rawX = startPosRef.current.x + dx;
+    const rawY = startPosRef.current.y + dy;
+
+    const clampedX = Math.max(minX, Math.min(maxX, rawX));
+    const clampedY = Math.max(minY, Math.min(maxY, rawY));
+
+    const nextPos = { x: clampedX, y: clampedY };
+    currentPosRef.current = nextPos;
+    setPosition(nextPos);
+  };
+
+  const handlePointerUp = (e) => {
+    if (!isDraggingRef.current) return;
+
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    } catch {}
+
+    isDraggingRef.current = false;
+
+    if (hasMovedRef.current) {
+      setIsDragging(false);
+      hasMovedRef.current = false;
+      justDraggedRef.current = true;
+      setTimeout(() => {
+        justDraggedRef.current = false;
+      }, 120);
+    } else {
+      setIsDragging(false);
+      setIsOpen(true);
+    }
+  };
+
+  const handlePointerCancel = (e) => {
+    if (!isDraggingRef.current) return;
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    } catch {}
+    isDraggingRef.current = false;
+    hasMovedRef.current = false;
+    setIsDragging(false);
+  };
+
+  const handleClick = (e) => {
+    if (justDraggedRef.current) {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+    setIsOpen(true);
+  };
+
+  const handleResetPosition = (e) => {
+    e?.stopPropagation?.();
+    setPosition(null);
+    currentPosRef.current = null;
+    try {
+      localStorage.removeItem(STORAGE_POS_KEY);
+    } catch {}
+  };
 
   // Icon mapper
   const getIcon = (iconName) => {
@@ -72,42 +297,73 @@ export default function WallLauncher() {
   ];
   const randomTip = tips[0];
 
-  // If tour is active, hide launcher to prevent UI clutter
-  if (isTourOpen) return null;
+  // If tour is active, secondary duplicate instance, or on a public page, do not render
+  if (isTourOpen || !isPrimaryInstance || isPublicRoute) return null;
 
   return (
-    <div className="fixed bottom-6 right-6 z-40 font-sans select-none">
+    <>
       {/* ─────────────────────────────────────────────────────────────
-          1. FLOATING WALL MINI-ORB BUTTON
+          1. DRAGGABLE FLOATING WALLY MINI-ORB BUTTON
          ───────────────────────────────────────────────────────────── */}
       {!isOpen && (
-        <motion.button
-          initial={{ scale: 0, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          whileHover={{ scale: 1.06 }}
-          whileTap={{ scale: 0.94 }}
-          onClick={() => setIsOpen(true)}
-          className="relative group flex items-center gap-2.5 px-4 py-2.5 rounded-full bg-slate-900/90 dark:bg-black/90 backdrop-blur-xl border border-white/20 dark:border-accent-border shadow-[0_10px_30px_rgba(0,0,0,0.5),0_0_20px_rgba(0,207,255,0.25)] text-white transition-all cursor-pointer"
-          title="Open Wall's Guidebook"
+        <div
+          style={
+            position
+              ? {
+                  position: "fixed",
+                  left: `${position.x}px`,
+                  top: `${position.y}px`,
+                  zIndex: 40,
+                }
+              : {
+                  position: "fixed",
+                  zIndex: 40,
+                }
+          }
+          className={`font-sans select-none touch-none ${
+            position ? "" : "right-2.5 bottom-2.5 min-[480px]:right-4 min-[480px]:bottom-4"
+          }`}
         >
-          {/* Subtle glowing animated beacon */}
-          <div className="absolute -inset-0.5 bg-gradient-to-r from-accent-primary to-[#00CFFF] rounded-full blur-md opacity-40 group-hover:opacity-80 transition-opacity" />
+          <motion.button
+            ref={buttonRef}
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ scale: isDragging ? 1.05 : 1, opacity: 1 }}
+            whileHover={isDragging ? undefined : { scale: 1.04 }}
+            whileTap={isDragging ? undefined : { scale: 0.96 }}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            onPointerCancel={handlePointerCancel}
+            onClick={handleClick}
+            onDoubleClick={handleResetPosition}
+            className={`relative group flex items-center gap-2 p-2 min-[480px]:px-4 min-[480px]:py-2.5 rounded-full bg-white/95 dark:bg-slate-900/90 backdrop-blur-xl border border-slate-200/90 dark:border-accent-border/60 text-slate-900 dark:text-white select-none touch-none transition-all duration-150 ${
+              isDragging
+                ? "cursor-grabbing shadow-2xl ring-2 ring-accent-primary/60 scale-105"
+                : "cursor-grab shadow-xl shadow-slate-900/10 dark:shadow-black/50 hover:border-accent-primary/80 hover:shadow-2xl"
+            }`}
+            title="Drag to place Wally anywhere • Click to open Guidebook • Double-click to reset position"
+          >
+            {/* Subtle drag grip dots */}
+            <div className="relative text-slate-400 group-hover:text-slate-600 dark:text-white/30 dark:group-hover:text-white/60 transition-colors shrink-0 -ml-1">
+              <GripVertical size={13} />
+            </div>
 
-          {/* Wall mini icon */}
-          <div className="relative w-8 h-8 -my-1 -ml-1">
-            <WallMascot gesture="waving" size={36} />
-          </div>
+            {/* Wall mini icon */}
+            <div className="relative w-8 h-8 flex items-center justify-center shrink-0 pointer-events-none">
+              <WallMascot gesture={isDragging ? "celebrating" : "waving"} size={32} />
+            </div>
 
-          <div className="relative flex flex-col text-left">
-            <span className="text-xs font-black tracking-wider text-white uppercase flex items-center gap-1.5">
-              Wally Guide
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_#10B981]" />
-            </span>
-            <span className="text-[10px] text-white/50 font-semibold tracking-tight">
-              Tutorials & Help
-            </span>
-          </div>
-        </motion.button>
+            <div className="relative hidden min-[480px]:flex flex-col text-left pr-1 pointer-events-none">
+              <span className="text-xs font-black tracking-wider text-slate-900 dark:text-white uppercase flex items-center gap-1.5">
+                Wally Guide
+                <span className="w-2 h-2 rounded-full bg-accent-primary animate-pulse shadow-[0_0_8px_var(--accent-glow)]" />
+              </span>
+              <span className="text-[10px] text-slate-500 dark:text-white/50 font-semibold tracking-tight">
+                Tutorials & Help
+              </span>
+            </div>
+          </motion.button>
+        </div>
       )}
 
       {/* ─────────────────────────────────────────────────────────────
@@ -131,10 +387,10 @@ export default function WallLauncher() {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
               transition={{ type: "spring", stiffness: 350, damping: 26 }}
-              className="fixed bottom-6 right-6 sm:bottom-8 sm:right-8 z-50 w-[92vw] max-w-md rounded-3xl bg-[#071613]/95 dark:bg-[#030A08]/95 backdrop-blur-3xl border border-white/20 dark:border-white/15 p-6 text-white shadow-[0_30px_80px_rgba(0,0,0,0.85),0_0_40px_rgba(0,207,255,0.15)] overflow-hidden max-h-[85vh] flex flex-col"
+              className="fixed bottom-3 inset-x-2.5 min-[480px]:inset-x-4 sm:inset-auto sm:bottom-8 sm:right-8 z-50 w-auto sm:w-[92vw] sm:max-w-md rounded-2xl sm:rounded-3xl bg-white/98 dark:bg-vault-surface/95 backdrop-blur-3xl border border-slate-200 dark:border-white/[0.1] p-4 sm:p-6 text-slate-900 dark:text-white shadow-[0_20px_50px_rgba(0,0,0,0.15)] dark:shadow-[0_30px_80px_rgba(0,0,0,0.85)] overflow-hidden max-h-[85vh] flex flex-col"
             >
               {/* Top Neon Accent Line */}
-              <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-[#00CFFF] via-[#10B981] to-[#8B5CF6]" />
+              <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-accent-primary via-accent-primary/80 to-accent-primary/60" />
 
               {/* Header */}
               <div className="flex items-center justify-between gap-3 mb-5 shrink-0">
@@ -143,10 +399,10 @@ export default function WallLauncher() {
                     <WallMascot gesture="waving" size={48} />
                   </div>
                   <div>
-                    <h2 className="text-base font-black text-white tracking-tight flex items-center gap-1.5">
+                    <h2 className="text-base font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-1.5">
                       Wally's Guidebook
                     </h2>
-                    <p className="text-xs text-white/50 font-medium">
+                    <p className="text-xs text-slate-500 dark:text-white/50 font-medium">
                       Step-by-step interactive tutorials
                     </p>
                   </div>
@@ -155,7 +411,7 @@ export default function WallLauncher() {
                 <div className="flex items-center gap-1">
                   <button
                     onClick={toggleSound}
-                    className="p-2 rounded-xl text-white/50 hover:text-white hover:bg-white/10 transition-colors"
+                    className="p-2 rounded-xl text-slate-400 hover:text-slate-900 hover:bg-slate-100 dark:text-white/50 dark:hover:text-white dark:hover:bg-white/10 transition-colors"
                     title={soundEnabled ? "Mute Sound" : "Enable Sound"}
                   >
                     {soundEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
@@ -163,7 +419,7 @@ export default function WallLauncher() {
 
                   <button
                     onClick={() => setIsOpen(false)}
-                    className="p-2 rounded-xl text-white/50 hover:text-white hover:bg-white/10 transition-colors"
+                    className="p-2 rounded-xl text-slate-400 hover:text-slate-900 hover:bg-slate-100 dark:text-white/50 dark:hover:text-white dark:hover:bg-white/10 transition-colors"
                     title="Close Guidebook"
                   >
                     <X size={18} />
@@ -180,39 +436,42 @@ export default function WallLauncher() {
                   return (
                     <div
                       key={tour.id}
-                      className="group/item flex items-center justify-between p-3.5 rounded-2xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 hover:border-accent-border/60 transition-all duration-200"
+                      className="group/item flex items-center justify-between p-3.5 rounded-2xl bg-slate-50 hover:bg-slate-100/80 dark:bg-white/[0.04] dark:hover:bg-white/[0.08] border border-slate-200/80 dark:border-white/[0.06] hover:border-accent-border/50 transition-all duration-200"
                     >
-                      <div className="flex items-center gap-3.5 overflow-hidden">
-                        <div className="w-10 h-10 rounded-xl bg-accent-soft text-accent-primary border border-accent-border/40 flex items-center justify-center shrink-0 group-hover/item:scale-105 transition-transform">
-                          <Icon size={18} />
+                      <div className="flex items-center gap-3.5 min-w-0 flex-1">
+                        <div className="w-10 h-10 rounded-xl bg-accent-soft text-accent-primary border border-accent-border flex items-center justify-center shrink-0 transition-all duration-200 group-hover/item:opacity-90 shadow-sm">
+                          <Icon size={18} className="transition-transform duration-200 group-hover/item:scale-110" />
                         </div>
-                        <div className="overflow-hidden">
+                        <div className="overflow-hidden flex-1">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <h4 className="text-xs font-bold text-white truncate">
+                            <h4 className="text-xs font-bold text-slate-900 dark:text-white truncate">
                               {tour.title}
                             </h4>
                             {tour.badge && (
                               <span
-                                className={`text-[9px] font-bold px-1.5 py-0.2 rounded-full ${
+                                className={`inline-flex items-center gap-1 text-[9px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full shadow-sm ${
                                   tour.role === "owner"
-                                    ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
-                                    : tour.role === "manager"
-                                    ? "bg-purple-500/20 text-purple-300 border border-purple-500/30"
-                                    : "bg-cyan-500/20 text-cyan-300 border border-cyan-500/30"
+                                    ? "bg-amber-500/10 text-amber-700 dark:bg-amber-500/20 dark:text-amber-200 border border-amber-300 dark:border-amber-500/30"
+                                    : "bg-accent-soft text-accent-primary border border-accent-border"
                                 }`}
                               >
-                                {tour.badge}
+                                <span
+                                  className={`w-1 h-1 rounded-full ${
+                                    tour.role === "owner" ? "bg-amber-500" : "bg-accent-primary"
+                                  }`}
+                                />
+                                <span>{tour.badge}</span>
                               </span>
                             )}
                             {isCompleted && (
                               <CheckCircle2
                                 size={13}
-                                className="text-emerald-400 shrink-0"
+                                className="text-emerald-600 dark:text-emerald-400 shrink-0"
                                 title="Completed"
                               />
                             )}
                           </div>
-                          <p className="text-[11px] text-white/50 truncate max-w-[220px]">
+                          <p className="text-[11px] text-slate-500 dark:text-white/50 truncate max-w-[220px]">
                             {tour.description}
                           </p>
                         </div>
@@ -223,7 +482,7 @@ export default function WallLauncher() {
                           setIsOpen(false);
                           startTour(tour.id);
                         }}
-                        className="px-3.5 py-1.5 rounded-xl bg-accent-primary text-accent-foreground font-black text-[11px] uppercase tracking-wider flex items-center gap-1 shadow-accent-glow hover:opacity-90 active:scale-95 transition-all shrink-0 cursor-pointer"
+                        className="px-3.5 py-1.5 rounded-xl bg-accent-primary hover:bg-accent-hover text-accent-foreground font-bold text-[11px] uppercase tracking-wider flex items-center gap-1.5 active:scale-95 transition-all shrink-0 cursor-pointer shadow-sm"
                       >
                         <Play size={11} className="fill-current" />
                         <span>{isCompleted ? "Replay" : "Start"}</span>
@@ -234,36 +493,48 @@ export default function WallLauncher() {
               </div>
 
               {/* Tip from Wall */}
-              <div className="p-3 rounded-2xl bg-accent-soft/40 border border-accent-border/30 mb-4 shrink-0">
+              <div className="p-3 rounded-2xl bg-accent-soft border border-accent-border mb-4 shrink-0">
                 <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-accent-primary mb-1">
                   <Lightbulb size={12} />
                   <span>Wall's Pro-Tip</span>
                 </div>
-                <p className="text-xs text-white/80 font-medium leading-relaxed">
+                <p className="text-xs text-slate-700 dark:text-white/80 font-medium leading-relaxed">
                   {randomTip}
                 </p>
               </div>
 
-              {/* Footer: Reset Tutorial Progress */}
-              <div className="flex items-center justify-between pt-3 border-t border-white/10 text-xs shrink-0">
-                <span className="text-[11px] text-white/40 font-mono">
-                  {completedTours.length} / {Object.keys(tours).length} Completed
-                </span>
-
+              {/* Footer: Reset Tutorial Progress & Reset Position */}
+              <div className="flex items-center justify-between pt-3 border-t border-slate-200 dark:border-white/10 text-xs shrink-0">
                 <button
                   type="button"
-                  onClick={resetAllTours}
-                  className="text-[11px] font-bold text-white/40 hover:text-white/80 flex items-center gap-1 transition-colors"
-                  title="Reset tutorial progress to replay all"
+                  onClick={handleResetPosition}
+                  className="text-[11px] font-bold text-slate-400 hover:text-accent-primary dark:text-white/40 flex items-center gap-1 transition-colors cursor-pointer"
+                  title="Reset Wally's floating button to default corner position"
                 >
-                  <RotateCcw size={12} />
-                  <span>Reset All</span>
+                  <Move size={12} />
+                  <span>Reset Position</span>
                 </button>
+
+                <div className="flex items-center gap-3">
+                  <span className="text-[11px] text-slate-500 dark:text-white/40 font-mono hidden sm:inline">
+                    {completedTours.length} / {Object.keys(tours).length} Completed
+                  </span>
+
+                  <button
+                    type="button"
+                    onClick={resetAllTours}
+                    className="text-[11px] font-bold text-slate-400 hover:text-slate-700 dark:text-white/40 dark:hover:text-white/80 flex items-center gap-1 transition-colors"
+                    title="Reset tutorial progress to replay all"
+                  >
+                    <RotateCcw size={12} />
+                    <span>Reset All</span>
+                  </button>
+                </div>
               </div>
             </motion.div>
           </>
         )}
       </AnimatePresence>
-    </div>
+    </>
   );
 }

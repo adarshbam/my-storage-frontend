@@ -15,6 +15,9 @@ import Profile from "./pages/Profile";
 import OwnerSettings from "./pages/OwnerSettings/OwnerSettings";
 import SharedAccessClaim from "./pages/SharedAccessClaim";
 import WallyAcademyPage from "./pages/WallyAcademyPage";
+import PrivacyPolicyPage from "./pages/PrivacyPolicyPage";
+import TermsOfServicePage from "./pages/TermsOfServicePage";
+import SecurityPolicyPage from "./pages/SecurityPolicyPage";
 
 // Landing Page Components
 import Navbar from "./components/sections/Navbar";
@@ -32,14 +35,18 @@ import StandaloneLayout from "./layouts/StandaloneLayout";
 import FileBrowser from "./components/drive/FileBrowser";
 import TrashView from "./components/drive/TrashView";
 import BillingPlansPage from "./pages/BillingPlansPage";
+import GoogleDriveChamber from "./components/chambers/GoogleDriveChamber";
+import GitHubChamber from "./components/chambers/GitHubChamber";
+import WallGuideOverlay from "./components/guide/WallGuideOverlay";
+import WallLauncher from "./components/guide/WallLauncher";
 
 function LandingPage() {
   return (
     <div className="min-h-screen text-slate-900 dark:text-white font-sans transition-colors duration-300 relative">
       {/* Global Static Background */}
-      <div className="fixed inset-0 z-[0] bg-gradient-to-br from-[#f2faf7] via-[#e6f4f1] to-[#eaf7f4] dark:from-[#010a08] dark:via-[#021612] dark:to-[#010806] pointer-events-none">
-        {/* Subtle top radial tint – light: mint, dark: deep teal */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[80vw] h-[50vh] bg-[radial-gradient(ellipse,rgba(20,184,166,0.12)_0%,transparent_70%)] dark:bg-[radial-gradient(ellipse,rgba(16,185,129,0.08)_0%,transparent_70%)]" />
+      <div className="fixed inset-0 z-[0] bg-vault-bg pointer-events-none transition-colors duration-500">
+        {/* Subtle top radial tint powered by active theme */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[80vw] h-[55vh] bg-[radial-gradient(ellipse,rgba(var(--accent-primary-rgb),0.12)_0%,transparent_70%)] dark:bg-[radial-gradient(ellipse,rgba(var(--accent-primary-rgb),0.09)_0%,transparent_70%)]" />
       </div>
 
       <div className="relative z-10 flex flex-col min-h-screen">
@@ -82,7 +89,12 @@ function ScrollToHashElement() {
 
 function App() {
   return (
-    <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
+    <ThemeProvider
+      defaultTheme="dark"
+      defaultAccent="grove-green"
+      storageKey="vite-ui-theme"
+      accentStorageKey="vite-ui-accent-v3"
+    >
       <AuthProvider>
         <PlanProvider>
           <BrowserRouter>
@@ -92,6 +104,9 @@ function App() {
                 <Suspense fallback={<PageLoader />}>
                 <Routes>
                   <Route path="/" element={<LandingPage />} />
+                  <Route path="/privacy" element={<PrivacyPolicyPage />} />
+                  <Route path="/terms" element={<TermsOfServicePage />} />
+                  <Route path="/security" element={<SecurityPolicyPage />} />
                   <Route
                     path="/shared-access/:token"
                     element={<SharedAccessClaim />}
@@ -163,19 +178,19 @@ function App() {
                       />
                       <Route
                         path="google-drive"
-                        element={<FileBrowser specialView="google-drive" />}
+                        element={<GoogleDriveChamber />}
                       />
                       <Route
                         path="google-drive/:driveFolderId"
-                        element={<FileBrowser specialView="google-drive-folder" />}
+                        element={<GoogleDriveChamber />}
                       />
                       <Route
                         path="github"
-                        element={<FileBrowser specialView="github" />}
+                        element={<GitHubChamber />}
                       />
                       <Route
                         path="github/*"
-                        element={<FileBrowser specialView="github-repo" />}
+                        element={<GitHubChamber />}
                       />
                       <Route path="trash" element={<TrashView />} />
                     </Route>
@@ -188,8 +203,12 @@ function App() {
                   />
                 </Routes>
               </Suspense>
-              </ShortcutProvider>
-            </GuideProvider>
+
+              {/* Global Singleton for Wally Interactive Onboarding Guide & Launcher */}
+              <WallGuideOverlay />
+              <WallLauncher />
+            </ShortcutProvider>
+          </GuideProvider>
           </BrowserRouter>
         </PlanProvider>
       </AuthProvider>

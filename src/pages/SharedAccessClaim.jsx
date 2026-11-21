@@ -177,16 +177,20 @@ export default function SharedAccessClaim() {
 
   return (
     <div className="min-h-[100dvh] text-slate-900 dark:text-white font-sans transition-colors duration-300 relative flex items-center justify-center p-3 sm:p-4">
-      {/* Background radial effects */}
-      <div className="fixed inset-0 z-[0] bg-[#f0f9f7] dark:bg-[#020b08] pointer-events-none">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[80vw] h-[80vh] bg-[radial-gradient(ellipse,rgba(20,184,166,0.12)_0%,transparent_70%)] dark:bg-[radial-gradient(ellipse,rgba(20,184,166,0.08)_0%,transparent_70%)]" />
+      {/* Background radial effects matching Homepage formula */}
+      <div className="fixed inset-0 z-[0] bg-vault-bg pointer-events-none transition-colors duration-500 overflow-hidden">
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[85vw] h-[55vh] bg-[radial-gradient(ellipse_at_top,rgba(var(--accent-primary-rgb),0.13)_0%,rgba(var(--accent-primary-rgb),0.035)_45%,transparent_75%)] dark:bg-[radial-gradient(ellipse_at_top,rgba(var(--accent-primary-rgb),0.10)_0%,rgba(var(--accent-primary-rgb),0.025)_45%,transparent_75%)]" />
+        <div className="absolute top-[10%] left-1/2 -translate-x-1/2 w-[70vw] h-[45vh] bg-accent-soft rounded-full blur-[140px] opacity-70" />
+        <div className="absolute bottom-[-5%] right-[10%] w-[35vw] h-[35vw] bg-accent-glow rounded-full blur-[130px] opacity-25" />
       </div>
 
-      <div className="relative z-10 w-full max-w-lg bg-white/70 dark:bg-vault-surface/90 backdrop-blur-2xl border border-black/5 dark:border-white/10 rounded-3xl p-5 sm:p-8 shadow-2xl dark:shadow-[0_12px_40px_rgba(0,0,0,0.8)]">
+      <div className="relative z-10 w-full max-w-lg bg-white/80 dark:bg-vault-surface/90 backdrop-blur-2xl border border-slate-200 dark:border-white/10 rounded-2xl sm:rounded-3xl p-4 min-[360px]:p-5 sm:p-8 shadow-2xl dark:shadow-[0_12px_40px_rgba(0,0,0,0.8)] min-w-0 overflow-hidden">
+        {/* Subtle Top Radial Aura */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-[160px] bg-[radial-gradient(ellipse_at_top,rgba(var(--accent-primary-rgb),0.14)_0%,transparent_70%)] dark:bg-[radial-gradient(ellipse_at_top,rgba(var(--accent-primary-rgb),0.10)_0%,transparent_70%)] pointer-events-none rounded-t-3xl z-0" />
         
         {loading ? (
-          <div className="flex flex-col items-center text-center py-6 space-y-4">
-            <Skeleton variant="circular" className="w-16 h-16 bg-[#14b8a6]/20 mb-2" />
+          <div className="flex flex-col items-center text-center py-6 space-y-4 relative z-10">
+            <Skeleton variant="circular" className="w-16 h-16 bg-accent-soft mb-2" />
             <Skeleton className="w-48 h-6 rounded-lg" />
             <Skeleton className="w-64 h-4 rounded-md opacity-60" />
             <div className="w-full bg-slate-500/5 dark:bg-white/[0.02] border border-black/5 dark:border-white/[0.04] rounded-2xl p-4 space-y-3 mt-4">
@@ -230,7 +234,7 @@ export default function SharedAccessClaim() {
             <div className="p-4 bg-amber-500/10 text-amber-400 rounded-2xl border border-amber-500/20 mb-4 shadow-[0_0_20px_rgba(245,158,11,0.15)]">
               <Lock size={32} />
             </div>
-            <h2 className="text-xl sm:text-2xl font-extrabold mb-1 text-white">
+            <h2 className="text-lg min-[360px]:text-xl sm:text-2xl font-extrabold mb-1 text-white">
               Password Protected Vault
             </h2>
             <p className="text-xs sm:text-sm text-slate-400 mb-6">
@@ -292,7 +296,7 @@ export default function SharedAccessClaim() {
                 <Share2 size={22} />
               </div>
               <div className="overflow-hidden">
-                <h2 className="text-xl font-bold text-white truncate">
+                <h2 className="text-base min-[360px]:text-lg sm:text-xl font-bold text-white truncate">
                   {linkData?.title || (linkData?.items?.length === 1 ? linkData.items[0].name : "Shared Vault Node")}
                 </h2>
                 <div className="flex items-center gap-2 text-xs text-white/40 font-mono">

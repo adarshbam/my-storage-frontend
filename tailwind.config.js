@@ -4,6 +4,9 @@ export default {
   darkMode: "class",
   theme: {
     extend: {
+      screens: {
+        xs: "480px",
+      },
       fontFamily: {
         sans: ["Inter", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "Roboto", "sans-serif"],
       },
@@ -15,7 +18,10 @@ export default {
           panel: "rgb(var(--bg-panel-rgb) / <alpha-value>)",
           elevated: "rgb(var(--bg-elevated-rgb) / <alpha-value>)",
           subtle: "rgb(var(--bg-subtle-rgb) / <alpha-value>)",
-          // Dynamic Emerald mapped directly to active accent tokens
+          // Dynamic theme tokens mapped directly to active accent tokens
+          coral: "rgb(var(--accent-primary-rgb) / <alpha-value>)",
+          "coral-soft": "var(--accent-soft)",
+          "coral-dark": "var(--accent-active)",
           emerald: "rgb(var(--accent-primary-rgb) / <alpha-value>)",
           "emerald-soft": "var(--accent-soft)",
           "emerald-dark": "var(--accent-active)",
@@ -29,14 +35,14 @@ export default {
           border: "var(--accent-border)",
           glow: "var(--accent-glow)",
         },
-        // Feature Module Identities (kept intentional and distinct)
-        relay: { accent: "#8B5CF6", glow: "#7C3AED" },
-        pulse: { accent: "#06B6D4", glow: "#0891B2" },
-        beacon: { accent: "#F59E0B", glow: "#D97706" },
+        // Feature Module Identities mapped strictly to active theme tokens (Trash remains red exception)
+        relay: { accent: "rgb(var(--accent-primary-rgb) / <alpha-value>)", glow: "var(--accent-glow)" },
+        pulse: { accent: "rgb(var(--accent-primary-rgb) / <alpha-value>)", glow: "var(--accent-glow)" },
+        beacon: { accent: "rgb(var(--accent-primary-rgb) / <alpha-value>)", glow: "var(--accent-glow)" },
         recycle: { accent: "#EF4444", glow: "#DC2626" },
-        core: { accent: "#3B82F6", glow: "#2563EB" },
-        linkdrive: { accent: "#F97316", glow: "#EA580C" },
-        linkgit: { accent: "#8B5CF6", glow: "#7C3AED" },
+        core: { accent: "rgb(var(--accent-primary-rgb) / <alpha-value>)", glow: "var(--accent-glow)" },
+        linkdrive: { accent: "rgb(var(--accent-primary-rgb) / <alpha-value>)", glow: "var(--accent-glow)" },
+        linkgit: { accent: "rgb(var(--accent-primary-rgb) / <alpha-value>)", glow: "var(--accent-glow)" },
         danger: { accent: "#EF4444" },
       },
       borderRadius: {

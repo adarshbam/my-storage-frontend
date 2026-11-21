@@ -4,6 +4,7 @@ import { SERVER_URL } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { handleGoogleAuth } from "../lib/googleAuth";
 import Button from "../components/ui/Button";
+import Checkbox from "../components/ui/Checkbox";
 import GoogleSignInButton from "../components/ui/GoogleSignInButton";
 import AuthLayout from "../layouts/AuthLayout";
 import {
@@ -17,13 +18,14 @@ import {
   X,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { VaultLogo } from "../components/ui/VaultIcons";
+import { VaultLogo, GitHubLogo } from "../components/ui/VaultIcons";
 
 export default function Register() {
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
 
   const [password, setPassword] = useState("");
+  const [agreedToPolicies, setAgreedToPolicies] = useState(false);
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [error, setError] = useState("");
   const [otpSent, setOtpSent] = useState(false);
@@ -54,8 +56,14 @@ export default function Register() {
         setOtpSent(true);
         setTimeout(() => document.getElementById("otp-0")?.focus(), 300);
       } else {
-        const data = await response.json();
-        setError(data.error || "Failed to send OTP");
+        let errorMsg = "Failed to send OTP";
+        try {
+          const data = await response.json();
+          errorMsg = data.error || data.message || errorMsg;
+        } catch {
+          // Non-JSON response
+        }
+        setError(errorMsg);
       }
     } catch (err) {
       setError("An error occurred. Please try again.");
@@ -81,8 +89,14 @@ export default function Register() {
       if (response.ok) {
         setOtpVerified(true);
       } else {
-        const data = await response.json();
-        setError(data.error || "Invalid OTP");
+        let errorMsg = "Invalid OTP";
+        try {
+          const data = await response.json();
+          errorMsg = data.error || data.message || errorMsg;
+        } catch {
+          // Non-JSON response
+        }
+        setError(errorMsg);
       }
     } catch (err) {
       setError("An error occurred. Please try again.");
@@ -150,8 +164,14 @@ export default function Register() {
           navigate("/login");
         }
       } else {
-        const data = await response.json();
-        setError(data.error || "Registration failed");
+        let errorMsg = "Registration failed";
+        try {
+          const data = await response.json();
+          errorMsg = data.error || data.message || errorMsg;
+        } catch {
+          // Non-JSON response
+        }
+        setError(errorMsg);
       }
     } catch (err) {
       setError("An error occurred. Please try again.");
@@ -182,15 +202,15 @@ export default function Register() {
 
   return (
     <AuthLayout>
-      <div className="w-full">
+      <div className="w-full min-w-0">
         {/* Header — logo visible on mobile only (promo panel hidden) */}
-        <div className="flex flex-col items-center mb-6 lg:hidden">
+        <div className="flex flex-col items-center mb-5 sm:mb-6 lg:hidden">
           <div className="p-2.5 rounded-2xl bg-accent-soft border border-accent-border text-accent-primary mb-3 shadow-sm">
             <VaultLogo size={24} />
           </div>
         </div>
-        <div className="flex flex-col mb-6 text-center lg:text-left">
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
+        <div className="flex flex-col mb-5 sm:mb-6 text-center lg:text-left">
+          <h1 className="text-xl min-[360px]:text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
             Create an account
           </h1>
           <p className="text-slate-500 dark:text-slate-400 mt-1 text-xs">
@@ -204,33 +224,33 @@ export default function Register() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4 w-full min-w-0">
           {/* Name & Email */}
-          <div>
+          <div className="w-full min-w-0">
             <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">
               Full Name
             </label>
-            <div className="flex gap-2 mb-3">
+            <div className="flex gap-2 mb-3 w-full min-w-0">
               <input
                 type="text"
                 required
                 value={name}
                 onChange={handleNameChange}
-                className="flex-1 min-w-0 px-4 py-2.5 rounded-xl bg-white/50 dark:bg-white/[0.06] backdrop-blur-sm border border-black/10 dark:border-white/10 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:ring-2 focus:ring-accent-primary focus:border-accent-primary outline-none transition-all text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 min-w-0 px-3.5 sm:px-4 py-2.5 rounded-xl bg-white/50 dark:bg-white/[0.06] backdrop-blur-sm border border-black/10 dark:border-white/10 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:ring-2 focus:ring-accent-primary focus:border-accent-primary outline-none transition-all text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
                 placeholder="Ada Lovelace"
               />
             </div>
             <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">
               Email Address
             </label>
-            <div className="flex gap-2">
+            <div className="flex items-center gap-1.5 min-[360px]:gap-2 w-full min-w-0">
               <input
                 type="email"
                 required
                 value={email}
                 onChange={handleEmailChange}
                 disabled={otpVerified}
-                className="flex-1 min-w-0 px-4 py-2.5 rounded-xl bg-white/50 dark:bg-white/[0.06] backdrop-blur-sm border border-black/10 dark:border-white/10 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:ring-2 focus:ring-accent-primary focus:border-accent-primary outline-none transition-all text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 min-w-0 px-3 min-[360px]:px-4 py-2.5 rounded-xl bg-white/50 dark:bg-white/[0.06] backdrop-blur-sm border border-black/10 dark:border-white/10 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:ring-2 focus:ring-accent-primary focus:border-accent-primary outline-none transition-all text-xs min-[360px]:text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
                 placeholder="name@example.com"
               />
 
@@ -247,7 +267,7 @@ export default function Register() {
                     transition={{ duration: 0.2 }}
                     whileTap={{ scale: 0.95 }}
                     className={`
-                      flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl font-bold text-xs whitespace-nowrap transition-all duration-200 overflow-hidden flex-shrink-0 cursor-pointer
+                      flex items-center justify-center gap-1 min-[360px]:gap-1.5 px-2.5 min-[360px]:px-3.5 py-2.5 rounded-xl font-bold text-xs whitespace-nowrap transition-all duration-200 overflow-hidden shrink-0 cursor-pointer
                       ${otpSent
                         ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30"
                         : "bg-accent-primary text-accent-foreground shadow-md shadow-accent-glow/20"
@@ -256,11 +276,11 @@ export default function Register() {
                     `}
                   >
                     {sendingOtp ? (
-                      <Loader2 className="animate-spin" size={15} />
+                      <Loader2 className="animate-spin" size={14} />
                     ) : (
                       <>
-                        <Send size={13} />
-                        {otpSent ? "Resend" : "Send"}
+                        <Send size={12} className="min-[360px]:w-[13px] min-[360px]:h-[13px]" />
+                        <span>{otpSent ? "Resend" : "Send"}</span>
                       </>
                     )}
                   </motion.button>
@@ -274,15 +294,15 @@ export default function Register() {
                     animate={{ opacity: 1, scale: 1 }}
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
-                    className="group relative flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 hover:bg-rose-500/10 hover:text-rose-600 hover:border-rose-500/20 dark:hover:bg-rose-500/10 dark:hover:text-rose-400 dark:hover:border-rose-500/20 transition-all duration-200 flex-shrink-0 overflow-hidden min-w-[95px]"
+                    className="group relative flex items-center justify-center gap-1.5 px-3 min-[360px]:px-3.5 py-2.5 rounded-xl text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 hover:bg-rose-500/10 hover:text-rose-600 hover:border-rose-500/20 dark:hover:bg-rose-500/10 dark:hover:text-rose-400 dark:hover:border-rose-500/20 transition-all duration-200 shrink-0 overflow-hidden min-w-[85px] min-[360px]:min-w-[95px]"
                     title="Click to change email address"
                   >
                     <span className="flex items-center gap-1.5 group-hover:hidden transition-all duration-200">
-                      <CheckCircle2 size={15} />
+                      <CheckCircle2 size={14} />
                       Verified
                     </span>
                     <span className="hidden group-hover:flex items-center gap-1.5 transition-all duration-200">
-                      <Pencil size={13} />
+                      <Pencil size={12} />
                       Change
                     </span>
                   </motion.button>
@@ -299,12 +319,12 @@ export default function Register() {
                 animate={{ opacity: 1, height: "auto", marginTop: 16 }}
                 exit={{ opacity: 0, height: 0, marginTop: 0 }}
                 transition={{ duration: 0.2, ease: "easeOut" }}
-                className="overflow-hidden"
+                className="overflow-hidden w-full min-w-0"
               >
                 <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
                   Verification Code
                 </label>
-                <div className="flex gap-1.5 sm:gap-2 justify-center mb-3" onPaste={handleOtpPaste}>
+                <div className="flex gap-1 min-[340px]:gap-1.5 sm:gap-2 justify-center mb-3 w-full min-w-0" onPaste={handleOtpPaste}>
                   {otp.map((digit, idx) => (
                     <input
                       key={idx}
@@ -315,11 +335,11 @@ export default function Register() {
                       value={digit}
                       onChange={(e) => handleOtpChange(idx, e.target.value.replace(/\D/, ""))}
                       onKeyDown={(e) => handleOtpKeyDown(idx, e)}
-                      className="w-9 sm:w-10 h-11 text-center text-sm sm:text-base font-bold rounded-xl bg-white/50 dark:bg-white/[0.06] backdrop-blur-sm border border-black/10 dark:border-white/10 text-slate-900 dark:text-white focus:ring-2 focus:ring-accent-primary focus:border-accent-primary outline-none transition-all caret-accent-primary"
+                      className="w-8 min-[340px]:w-9 sm:w-10 h-10 min-[340px]:h-11 text-center text-xs min-[340px]:text-sm sm:text-base font-bold rounded-xl bg-white/50 dark:bg-white/[0.06] backdrop-blur-sm border border-black/10 dark:border-white/10 text-slate-900 dark:text-white focus:ring-2 focus:ring-accent-primary focus:border-accent-primary outline-none transition-all caret-accent-primary"
                     />
                   ))}
                 </div>
-                <div className="flex gap-2.5">
+                <div className="flex gap-2 min-[360px]:gap-2.5">
                   <motion.button
                     id="verify-otp-btn"
                     type="button"
@@ -345,7 +365,7 @@ export default function Register() {
                     type="button"
                     onClick={handleResetEmailVerification}
                     whileTap={{ scale: 0.97 }}
-                    className="px-4 py-2.5 rounded-xl font-bold text-xs bg-slate-100 hover:bg-slate-200 dark:bg-white/[0.06] dark:hover:bg-white/[0.1] border border-black/10 dark:border-white/10 text-slate-700 dark:text-slate-300 transition-colors flex items-center justify-center gap-1.5"
+                    className="px-3 min-[360px]:px-4 py-2.5 rounded-xl font-bold text-xs bg-slate-100 hover:bg-slate-200 dark:bg-white/[0.06] dark:hover:bg-white/[0.1] border border-black/10 dark:border-white/10 text-slate-700 dark:text-slate-300 transition-colors flex items-center justify-center gap-1.5"
                   >
                     <X size={15} />
                     Cancel
@@ -370,16 +390,43 @@ export default function Register() {
             />
           </div>
 
+          {/* Mandatory Consent Checkbox */}
+          <div className="pt-2">
+            <Checkbox
+              id="consent-policies"
+              required
+              checked={agreedToPolicies}
+              onChange={(e) => setAgreedToPolicies(e.target.checked)}
+              variant="accent"
+              size="md"
+            >
+              <span className="text-xs text-slate-600 dark:text-slate-300 leading-normal">
+                I agree to Vault's{" "}
+                <Link to="/terms" target="_blank" className="text-accent-primary underline font-bold">
+                  Terms of Service
+                </Link>{" "}
+                and{" "}
+                <Link to="/privacy" target="_blank" className="text-accent-primary underline font-bold">
+                  Privacy Policy
+                </Link>
+                , including the Google API Limited Use disclosure.
+              </span>
+            </Checkbox>
+          </div>
+
           <div className="w-full relative group pt-1">
             <Button 
               type="submit" 
-              disabled={!otpVerified}
+              disabled={!otpVerified || !agreedToPolicies}
               className="w-full py-3 text-xs uppercase tracking-wider font-bold"
             >
               Create Account
             </Button>
-            {!otpVerified && (
-              <div className="absolute inset-0 z-10 cursor-not-allowed" title="Verify email first" />
+            {(!otpVerified || !agreedToPolicies) && (
+              <div
+                className="absolute inset-0 z-10 cursor-not-allowed"
+                title={!otpVerified ? "Verify email first" : "Please agree to the Terms of Service and Privacy Policy to proceed"}
+              />
             )}
           </div>
         </form>
@@ -392,6 +439,19 @@ export default function Register() {
           </span>
           <div className="flex-1 h-px bg-black/10 dark:bg-white/10" />
         </div>
+
+        {/* Policy notice for OAuth */}
+        <p className="text-[11px] text-center text-slate-500 dark:text-slate-400 leading-relaxed mb-3">
+          By signing up with Google or GitHub, you agree to Vault's{" "}
+          <Link to="/terms" target="_blank" className="text-accent-primary underline font-medium">
+            Terms of Service
+          </Link>{" "}
+          and{" "}
+          <Link to="/privacy" target="_blank" className="text-accent-primary underline font-medium">
+            Privacy Policy
+          </Link>
+          .
+        </p>
 
         {/* Google Sign Up */}
         <div className="flex flex-col gap-2.5">
@@ -413,22 +473,14 @@ export default function Register() {
             type="button"
             onClick={() => {
               const clientId = import.meta.env.VITE_GITHUB_CLIENTID;
-              const redirectUri = `${SERVER_URL}/user/auth/github`;
-              window.location.href = `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&scope=user:email`;
+              const redirectUri = SERVER_URL.startsWith("http")
+                ? `${SERVER_URL}/user/auth/github`
+                : `${window.location.origin}${SERVER_URL}/user/auth/github`;
+              window.location.href = `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=user:email,repo&state=${encodeURIComponent(`login|${window.location.origin}`)}`;
             }}
-            className="w-full flex items-center justify-center gap-2.5 px-4 py-2.5 rounded-xl border border-black/10 dark:border-white/10 bg-white/50 dark:bg-white/[0.06] backdrop-blur-sm text-slate-700 dark:text-slate-200 font-bold text-xs hover:bg-slate-50 dark:hover:bg-white/10 transition-colors"
+            className="w-full flex items-center justify-center gap-2.5 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-100 hover:bg-slate-200 dark:bg-white/[0.06] dark:hover:bg-white/[0.1] text-slate-700 dark:text-slate-200 font-bold text-xs shadow-sm transition-colors"
           >
-            <svg
-              className="w-4 h-4 fill-current"
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-            >
-              <path
-                fillRule="evenodd"
-                d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 100 0 0022 12.017C22 6.484 17.522 2 12 2z"
-                clipRule="evenodd"
-              />
-            </svg>
+            <GitHubLogo size={16} />
             Sign up with GitHub
           </button>
         </div>

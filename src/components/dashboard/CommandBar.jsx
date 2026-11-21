@@ -12,20 +12,20 @@ import {
   SystemCoreIcon,
   VaultDriveIcon,
   VaultGitIcon,
+  VaultShareIcon,
+  VaultUploadIcon,
+  VaultNewFolderIcon,
+  VaultNewFileIcon,
 } from "../ui/VaultIcons";
 import ProfileMenu from "../ui/ProfileMenu";
 import NotificationBell from "../notifications/NotificationBell";
 import {
   Search,
   Bell,
-  Upload,
-  FolderPlus,
-  FilePlus,
   Plus,
   Menu,
   PanelLeft,
   MoreVertical,
-  Share2,
   X,
   HardDrive,
   User,
@@ -50,7 +50,7 @@ export default function CommandBar({
 }) {
   const navigate = useNavigate();
   const { user, setUser } = useAuth();
-  const { isNoPlan, rules, hasFeature } = usePlan();
+  const { isNoPlan, isNoSubscription, rules, hasFeature } = usePlan();
   const location = useLocation();
 
   const isVaultRoute =
@@ -66,17 +66,11 @@ export default function CommandBar({
     location.pathname.startsWith("/dashboard/owner/folder") ||
     location.pathname === "/dashboard/search";
 
-  const allowUpload = !isNoPlan && (rules?.permissions?.allowUpload ?? true);
+  const allowUpload = !(isNoPlan || isNoSubscription) && (rules?.permissions?.allowUpload ?? true);
 
   const guardAction = (actionFn, requiresUpload = true) => {
-    if (isNoPlan || (requiresUpload && !allowUpload)) {
-      if (
-        window.confirm(
-          "Your current account is in Read-Only mode (No Active Plan). Would you like to view plans or activate your free trial to unlock this action?",
-        )
-      ) {
-        navigate("/dashboard/billing");
-      }
+    if (isNoPlan || isNoSubscription || (requiresUpload && !allowUpload)) {
+      window.dispatchEvent(new CustomEvent("subscription:prompt"));
       return;
     }
     actionFn();
@@ -157,7 +151,7 @@ export default function CommandBar({
   const quickActions = [
     {
       label: "Share Vault",
-      icon: Share2,
+      icon: VaultShareIcon,
       onClick: () => guardAction(openShareModal, false),
       color: "var(--accent-primary)",
       hoverBg: "hover:bg-accent-soft",
@@ -167,32 +161,32 @@ export default function CommandBar({
     },
     {
       label: "Upload Asset",
-      icon: Upload,
+      icon: VaultUploadIcon,
       onClick: () => guardAction(openUploadModal, true),
-      color: "#00CFFF", // Cyan
-      hoverBg: "hover:bg-[rgba(0,207,255,0.1)]",
-      hoverText: "hover:text-pulse-accent",
-      glowHover: "hover:shadow-[0_0_15px_rgba(0,207,255,0.2)]",
+      color: "var(--accent-primary)",
+      hoverBg: "hover:bg-accent-soft",
+      hoverText: "hover:text-accent-primary",
+      glowHover: "hover:shadow-accent-glow-sm",
       tourId: "upload-btn",
     },
     {
       label: "New Directory",
-      icon: FolderPlus,
+      icon: VaultNewFolderIcon,
       onClick: () => guardAction(handleCreateClick, true),
-      color: "#C65CFF", // Purple
-      hoverBg: "hover:bg-[rgba(198,92,255,0.1)]",
-      hoverText: "hover:text-relay-accent",
-      glowHover: "hover:shadow-[0_0_15px_rgba(198,92,255,0.2)]",
+      color: "var(--accent-primary)",
+      hoverBg: "hover:bg-accent-soft",
+      hoverText: "hover:text-accent-primary",
+      glowHover: "hover:shadow-accent-glow-sm",
       tourId: "new-dir-btn",
     },
     {
       label: "New File",
-      icon: FilePlus,
+      icon: VaultNewFileIcon,
       onClick: () => guardAction(handleCreateFileClick, true),
-      color: "#FF7A3D", // Orange
-      hoverBg: "hover:bg-[rgba(255,122,61,0.1)]",
-      hoverText: "hover:text-linkdrive-accent",
-      glowHover: "hover:shadow-[0_0_15px_rgba(255,122,61,0.2)]",
+      color: "var(--accent-primary)",
+      hoverBg: "hover:bg-accent-soft",
+      hoverText: "hover:text-accent-primary",
+      glowHover: "hover:shadow-accent-glow-sm",
       tourId: "new-file-btn",
     },
   ];
@@ -225,6 +219,24 @@ export default function CommandBar({
       aliases: ["/tutorials"],
       icon: Sparkles,
     },
+    ...(user?.integrations?.googleDrive?.connected
+      ? [
+          {
+            name: "Google Drive",
+            path: "/dashboard/google-drive",
+            icon: VaultDriveIcon,
+          },
+        ]
+      : []),
+    ...(user?.integrations?.github?.connected
+      ? [
+          {
+            name: "GitHub",
+            path: "/dashboard/github",
+            icon: VaultGitIcon,
+          },
+        ]
+      : []),
     ...(isManagerOrAdmin
       ? [
           {
@@ -423,7 +435,7 @@ export default function CommandBar({
       )}
 
       {/* LEFT: System Identity */}
-      <div className="flex items-center gap-2 sm:gap-3 w-auto sm:w-[240px] shrink-0">
+      <div className="flex items-center gap-2 sm:gap-3 w-auto md:w-[240px] shrink-0">
         <button
           onClick={() => setIsMobileOpen(!isMobileOpen)}
           className={`md:hidden p-1.5 -ml-1 mr-1 rounded-xl border transition-all shadow-[inset_0_0_10px_rgba(0,212,165,0.05)] flex items-center justify-center
@@ -438,13 +450,13 @@ export default function CommandBar({
         </button>
         <Link
           to="/"
-          className="flex items-center gap-2 sm:gap-3 group cursor-pointer"
+          className="flex items-center gap-2 sm:gap-3 group cursor-pointer shrink-0"
           title="Go to Home"
         >
           <div className="bg-accent-soft border border-accent-border p-1 sm:p-1.5 rounded-xl shadow-sm relative group-hover:border-accent-primary transition-colors">
             <VaultLogo className="text-accent-primary" size={18} />
           </div>
-          <span className="text-base sm:text-lg font-black tracking-widest text-slate-900 dark:text-white uppercase group-hover:text-accent-primary transition-colors">
+          <span className="text-base sm:text-lg font-black tracking-widest text-slate-900 dark:text-white uppercase group-hover:text-accent-primary transition-colors hidden min-[380px]:inline">
             Vault OS
           </span>
         </Link>
@@ -471,7 +483,9 @@ export default function CommandBar({
                 onChange={(e) => setGlobalSearchQuery(e.target.value)}
                 onKeyDown={onSearchExecute}
                 onFocus={() => setShowRecentSearches(true)}
-                onBlur={() => setTimeout(() => setShowRecentSearches(false), 200)}
+                onBlur={() =>
+                  setTimeout(() => setShowRecentSearches(false), 200)
+                }
                 className="w-full bg-transparent border-none outline-none text-sm text-slate-900 dark:text-white px-3 placeholder:text-slate-400 dark:placeholder:text-white/30 font-medium"
               />
               <button
@@ -503,13 +517,15 @@ export default function CommandBar({
 
             {/* Filter Dropdown */}
             {showFilters && (
-              <div className="absolute top-full sm:top-[calc(100%+8px)] left-0 mt-2 sm:mt-0 w-[100vw] sm:w-full -ml-4 sm:ml-0 bg-white/95 dark:bg-vault-surface/95 backdrop-blur-xl border-y sm:border border-slate-200 dark:border-white/10 sm:rounded-2xl shadow-2xl z-50 p-4 text-slate-900 dark:text-white max-h-[75vh] overflow-y-auto custom-scrollbar">
+              <div className="absolute top-[calc(100%+8px)] left-0 w-full bg-white/95 dark:bg-vault-surface/95 backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-2xl shadow-2xl z-50 p-4 text-slate-900 dark:text-white max-h-[75vh] overflow-y-auto custom-scrollbar">
                 <h3 className="text-xs font-bold tracking-widest text-accent-primary uppercase mb-4 border-b border-slate-200 dark:border-white/10 pb-2">
                   Advanced Search
                 </h3>
                 <div className="space-y-3">
                   <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
-                    <label className="text-xs text-slate-500 dark:text-white/50 w-20">Scope</label>
+                    <label className="text-xs text-slate-500 dark:text-white/50 w-20">
+                      Scope
+                    </label>
                     <div className="flex gap-2 flex-1 w-full">
                       <button
                         onClick={() => setSearchScope("current")}
@@ -538,7 +554,9 @@ export default function CommandBar({
                     />
                   </div>
                   <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
-                    <label className="text-xs text-slate-500 dark:text-white/50 w-20">Max Size</label>
+                    <label className="text-xs text-slate-500 dark:text-white/50 w-20">
+                      Max Size
+                    </label>
                     <select
                       value={searchSize}
                       onChange={(e) => setSearchSize(e.target.value)}
@@ -560,21 +578,25 @@ export default function CommandBar({
 
       {/* RIGHT: Quick Actions & Status */}
       <div className="flex items-center gap-3 shrink-0">
-        {/* Quick Create Actions (Vault Only) */}
-        {isVaultRoute && (
+        {/* Quick Create Actions (Vault Only - hidden in Google Drive Chamber) */}
+        {isVaultRoute && !location.pathname.startsWith("/dashboard/google-drive") && (
           <div
             data-tour="quick-actions"
             className="hidden lg:flex items-center gap-1 border-r border-slate-200 dark:border-white/10 pr-3 mr-1"
           >
             {location.pathname === "/dashboard/github" ? (
-              <button
-                onClick={() => document.dispatchEvent(new CustomEvent("createRepoTrigger"))}
-                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-accent-soft text-accent-primary border border-accent-border hover:bg-accent-primary hover:text-accent-foreground text-xs font-bold transition-all shadow-sm active:scale-95"
-                title="Create New GitHub Repository"
-              >
-                <Plus size={14} />
-                <span>New Repository</span>
-              </button>
+              user?.integrations?.github?.connected ? (
+                <button
+                  onClick={() =>
+                    document.dispatchEvent(new CustomEvent("createRepoTrigger"))
+                  }
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-accent-soft text-accent-primary border border-accent-border hover:bg-accent-primary hover:text-accent-foreground text-xs font-bold transition-all shadow-sm active:scale-95"
+                  title="Create New GitHub Repository"
+                >
+                  <Plus size={14} />
+                  <span>New Repository</span>
+                </button>
+              ) : null
             ) : (
               quickActions.map((action) => (
                 <button
@@ -583,7 +605,7 @@ export default function CommandBar({
                   onClick={() => {
                     action.onClick();
                   }}
-                  className={`p-2 text-slate-500 dark:text-white/50 ${action.hoverText} ${action.hoverBg} ${action.glowHover} rounded-xl transition-all duration-200`}
+                  className="p-2 text-slate-600 dark:text-slate-300 hover:text-accent-primary hover:bg-accent-soft/70 rounded-xl transition-all duration-200"
                   title={action.label}
                 >
                   <action.icon size={18} />
@@ -612,18 +634,20 @@ export default function CommandBar({
         <div className="hidden md:flex items-center gap-2 border-r border-slate-200 dark:border-white/10 pr-3 mr-1">
           {user?.integrations?.googleDrive?.connected && (
             <div
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-linkdrive-accent/10 border border-linkdrive-accent/20"
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100/70 dark:bg-white/[0.04] border border-slate-200/60 dark:border-white/[0.08] transition-all"
               title="Google Drive Connected"
             >
-              <VaultDriveIcon size={14} className="text-linkdrive-accent" />
+              <VaultDriveIcon size={14} className="text-slate-700 dark:text-white" />
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.5)]" />
             </div>
           )}
           {user?.integrations?.github?.connected && (
             <div
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-linkgit-accent/10 border border-linkgit-accent/20"
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100/70 dark:bg-white/[0.04] border border-slate-200/60 dark:border-white/[0.08] transition-all"
               title="GitHub Connected"
             >
-              <VaultGitIcon size={14} className="text-linkgit-accent" />
+              <VaultGitIcon size={14} className="text-slate-700 dark:text-white" />
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.5)]" />
             </div>
           )}
         </div>
@@ -655,26 +679,32 @@ export default function CommandBar({
             <div className="w-8 h-8 rounded-xl flex items-center justify-center bg-accent-soft text-accent-primary border border-accent-border">
               <Search size={16} />
             </div>
-            <span className="text-xs font-semibold">Search Vault Assets...</span>
+            <span className="text-xs font-semibold">
+              Search Vault Assets...
+            </span>
           </button>
 
-          {/* Quick Actions (Vault Only) */}
-          {isVaultRoute && (
+          {/* Quick Actions (Vault Only - hidden in Google Drive Chamber) */}
+          {isVaultRoute && !location.pathname.startsWith("/dashboard/google-drive") && (
             <div className="mb-4">
               <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-white/40 px-2 mb-2">
                 Vault Actions
               </div>
               {location.pathname === "/dashboard/github" ? (
-                <button
-                  onClick={() => {
-                    setShowMobileMenu(false);
-                    document.dispatchEvent(new CustomEvent("createRepoTrigger"));
-                  }}
-                  className="w-full flex items-center justify-center gap-2 p-3 rounded-2xl bg-accent-primary text-accent-foreground font-bold text-xs shadow-accent-glow active:scale-95 transition-transform"
-                >
-                  <Plus size={16} />
-                  <span>Create New Repository</span>
-                </button>
+                user?.integrations?.github?.connected ? (
+                  <button
+                    onClick={() => {
+                      setShowMobileMenu(false);
+                      document.dispatchEvent(
+                        new CustomEvent("createRepoTrigger"),
+                      );
+                    }}
+                    className="w-full flex items-center justify-center gap-2 p-3 rounded-2xl bg-accent-primary text-accent-foreground font-bold text-xs shadow-accent-glow active:scale-95 transition-transform"
+                  >
+                    <Plus size={16} />
+                    <span>Create New Repository</span>
+                  </button>
+                ) : null
               ) : (
                 <div className="grid grid-cols-2 gap-2">
                   {quickActions.map((action) => (
@@ -692,7 +722,10 @@ export default function CommandBar({
                           backgroundColor: `${action.color}15`,
                         }}
                       >
-                        <action.icon size={16} style={{ color: action.color }} />
+                        <action.icon
+                          size={16}
+                          style={{ color: action.color }}
+                        />
                       </div>
                       <span className="text-xs font-bold text-slate-800 dark:text-white/90 truncate">
                         {action.label}

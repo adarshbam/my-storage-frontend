@@ -17,6 +17,9 @@ import {
   History,
   CloudUpload,
   FolderGit2,
+  FolderOpen,
+  FileCode,
+  FolderInput,
 } from "lucide-react";
 import getFileImage, { renderFileIcon } from "../../lib/FileImages";
 import { formatSize, isSpecialFolder } from "../../lib/utils";
@@ -29,7 +32,7 @@ import { motion } from "framer-motion";
 import { SERVER_URL } from "../../lib/api";
 import { usePlan } from "../../context/PlanContext";
 import Skeleton from "../ui/Skeleton";
-import { prefetchFileContent } from "../../lib/fileCache";
+import { prefetchFileContent, isTextOrCode } from "../../lib/fileCache";
 import { useThumbnailUrl } from "../../lib/thumbnailCache";
 
 const formatRelativeTime = (dateString) => {
@@ -113,7 +116,7 @@ const getItemTypeInfo = (item, isDirectory, provider, specialView) => {
       };
     }
     return {
-      typeLabel: "DRIVE FOLDER",
+      typeLabel: "FOLDER",
       listLabel: "Drive Folder",
       badgeLabel: "GOOGLE DRIVE",
     };
@@ -176,6 +179,8 @@ export default function AssetCard({
   onViewHistory = null,
   onConfigureBackup = null,
   onCloneToVault = null,
+  onEdit = null,
+  onMove = null,
   specialView = null,
 }) {
   const navigate = useNavigate();
@@ -210,6 +215,13 @@ export default function AssetCard({
     (specialView === "github" || (isDirectory && pathParts.length <= 2));
 
   // Determine capabilities
+  const canEdit =
+    !isTrash &&
+    !effectiveReadOnly &&
+    !isDirectory &&
+    isTextOrCode(item.extension, item.name) &&
+    !!onEdit;
+
   const canRename =
     !isTrash &&
     !effectiveReadOnly &&
@@ -250,21 +262,9 @@ export default function AssetCard({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Environmental glow based on file type / provider
-  let envClass = "env-glow-emerald";
+  // Environmental glow based on active theme / trash
   const ext = item.name.split(".").pop()?.toLowerCase() || "";
-  if (provider === "google_drive" || provider === "shared_drive")
-    envClass = "env-glow-cyan";
-  else if (provider === "github") envClass = "env-glow-purple";
-  else if (["pdf", "doc", "docx", "txt"].includes(ext))
-    envClass = "env-glow-cyan";
-  else if (["png", "jpg", "jpeg", "mp4", "mov"].includes(ext))
-    envClass = "env-glow-orange";
-  else if (["csv", "xlsx", "json"].includes(ext)) envClass = "env-glow-gold";
-  else if (["js", "py", "ts", "jsx", "tsx", "html", "css"].includes(ext))
-    envClass = "env-glow-emerald";
-  if (item.isStarred || item.starred) envClass = "env-glow-orange";
-  if (isTrash) envClass = "env-glow-rose";
+  const envClass = isTrash ? "env-glow-rose" : "env-glow-accent";
 
   const handleDoubleClick = (e) => {
     e.preventDefault();
@@ -305,17 +305,17 @@ export default function AssetCard({
           vault-card-interactive group relative flex items-center p-3 rounded-2xl border transition-all duration-150 select-none
           ${
             isDragOver
-              ? "bg-accent-primary/20 dark:bg-emerald-950/70 border-2 border-accent-primary dark:border-emerald-400 ring-4 ring-accent-primary/60 shadow-[0_0_40px_rgba(16,185,129,0.85),0_0_80px_rgba(16,185,129,0.45),inset_0_0_20px_rgba(16,185,129,0.3)] scale-[1.03] z-30"
+              ? "bg-accent-soft border-2 border-accent-primary ring-4 ring-accent-primary/40 shadow-[0_0_40px_var(--accent-glow)] scale-[1.03] z-30"
               : "bg-white dark:bg-vault-surface/80 border-slate-200/90 dark:border-white/10 shadow-sm hover:shadow-md"
           }
-          ${selected && !isDragOver ? "ring-2 ring-accent-primary bg-accent-soft/30 dark:bg-accent-soft/20 border-accent-border shadow-md" : !isDragOver ? "hover:bg-slate-50/90 dark:hover:bg-vault-surface hover:border-slate-300 dark:hover:border-white/20" : ""}
+          ${selected && !isDragOver ? "border border-accent-primary ring-2 ring-accent-primary ring-inset bg-accent-soft/30 dark:bg-accent-soft/20 shadow-md" : !isDragOver ? "hover:bg-slate-50/90 dark:hover:bg-vault-surface hover:border-slate-300 dark:hover:border-white/20" : ""}
           ${isCut ? "opacity-35" : ""}
           ${isBeingDragged ? "opacity-40 scale-95 border-dashed border-accent-primary/60" : ""}
         `}
       >
         {/* Exaggerated Glow / Drop Target Overlay for List */}
         {isDragOver && (
-          <div className="absolute inset-0 rounded-2xl pointer-events-none border-2 border-dashed border-accent-primary z-40 flex items-center justify-end pr-4 bg-accent-primary/10 backdrop-blur-[1px] animate-pulse">
+          <div className="absolute inset-0 rounded-2xl pointer-events-none border-2 border-dashed border-accent-primary z-40 flex items-center justify-end pr-4 bg-accent-soft/40 backdrop-blur-[1px] animate-pulse">
             <div className="px-3 py-1 rounded-full bg-black/90 border border-accent-primary text-accent-primary text-xs font-mono font-bold tracking-wider shadow-[0_0_20px_var(--accent-glow)] flex items-center gap-1.5 animate-bounce">
               <FolderPlus size={14} />
               <span>DROP HERE</span>
@@ -330,14 +330,14 @@ export default function AssetCard({
           }`}
         />
 
-        <div className="w-10 h-10 rounded-lg bg-vault-black border border-white/10 flex items-center justify-center shrink-0 mr-4">
+        <div className="w-10 h-10 rounded-lg bg-slate-100 dark:bg-vault-black border border-slate-200 dark:border-white/10 flex items-center justify-center shrink-0 mr-4">
           {isDirectory ? (
             provider === "google_drive" ? (
-              <VaultDriveIcon size={20} className="text-document-accent" />
+              <VaultDriveIcon size={20} className="drop-shadow-[0_0_8px_rgba(77,166,255,0.4)]" />
             ) : provider === "github" ? (
-              <VaultGitIcon size={20} className="text-slate-800 dark:text-white" />
+              <VaultGitIcon size={20} className="text-slate-800 dark:text-white drop-shadow-[0_0_8px_rgba(198,92,255,0.4)]" />
             ) : (
-              <Folder size={20} className="text-vault-emerald" />
+              <Folder size={20} className="text-accent-primary" />
             )
           ) : (
             renderFileIcon(ext, { size: 20 })
@@ -354,7 +354,7 @@ export default function AssetCard({
               • {typeInfo.badgeLabel}
             </span>
             {item.openedAt && (
-              <span className="text-teal-600 dark:text-teal-400 font-semibold font-mono">
+              <span className="text-accent-primary font-semibold font-mono">
                 • Opened {formatRelativeTime(item.openedAt)}
               </span>
             )}
@@ -363,22 +363,22 @@ export default function AssetCard({
 
         <div className="hidden md:flex items-center gap-4 text-xs font-mono text-slate-500 dark:text-white/30 mr-6">
           <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-slate-100 dark:bg-black/40 border border-slate-200 dark:border-white/10 text-slate-700 dark:text-white/60">
-            <EncryptionBadgeIcon size={12} className="text-vault-emerald" />
+            <EncryptionBadgeIcon size={12} className="text-accent-primary" />
             <span>AES-256</span>
           </div>
           <div className="flex items-center gap-1">
-            <div className="status-dot status-dot-emerald" />
+            <div className="status-dot status-dot-accent" />
             <span className="text-[10px] text-slate-500 dark:text-white/50">Encrypted</span>
           </div>
           {(item.isShared || provider !== "local") && (
             <div className="flex items-center gap-1">
-              <div className="status-dot status-dot-purple" />
+              <div className="status-dot status-dot-accent" />
               <span className="text-[10px] text-white/50">Shared</span>
             </div>
           )}
           {(item.isStarred || item.starred) && (
             <div className="flex items-center gap-1">
-              <div className="status-dot status-dot-orange" />
+              <div className="status-dot status-dot-accent" />
               <span className="text-[10px] text-white/50">Starred</span>
             </div>
           )}
@@ -392,6 +392,18 @@ export default function AssetCard({
 
         {/* Action buttons for list row */}
         <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+          {!isTrash && isDirectory && onNavigate && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onNavigate(item);
+              }}
+              className="p-1.5 text-slate-400 hover:text-slate-900 dark:hover:text-white bg-slate-100 dark:bg-black/40 hover:bg-slate-200 dark:hover:bg-white/10 rounded-lg transition-all"
+              title="Open"
+            >
+              <FolderOpen size={16} />
+            </button>
+          )}
           {!isTrash && !isDirectory && onPreview && (
             <button
               onClick={(e) => {
@@ -404,6 +416,35 @@ export default function AssetCard({
               <ExternalLink size={16} />
             </button>
           )}
+          {!isTrash && !isSpecial && onStarred && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onStarred(item);
+              }}
+              className={`p-1.5 bg-slate-100 dark:bg-black/40 hover:bg-slate-200 dark:hover:bg-white/10 rounded-lg transition-all ${
+                item.isStarred || item.starred ? "text-[#FF7A3D]" : "text-slate-400 hover:text-[#FF7A3D]"
+              }`}
+              title="Priority"
+            >
+              <Star
+                size={16}
+                fill={item.isStarred || item.starred ? "#FF7A3D" : "none"}
+              />
+            </button>
+          )}
+          {!isTrash && !isSpecial && onShare && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onShare(item);
+              }}
+              className="p-1.5 text-slate-400 hover:text-accent-primary bg-slate-100 dark:bg-black/40 hover:bg-accent-soft rounded-lg transition-all"
+              title="Share"
+            >
+              <Share2 size={16} />
+            </button>
+          )}
           {onDetails && (
             <button
               onClick={(e) => {
@@ -414,6 +455,18 @@ export default function AssetCard({
               title="Details"
             >
               <Info size={16} />
+            </button>
+          )}
+          {canEdit && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onEdit(item);
+              }}
+              className="p-1.5 text-slate-400 hover:text-accent-primary bg-slate-100 dark:bg-black/40 hover:bg-accent-soft rounded-lg transition-all"
+              title="Edit File"
+            >
+              <FileCode size={16} />
             </button>
           )}
           {canRename && (
@@ -486,14 +539,16 @@ export default function AssetCard({
       onDragOver={(e) => onDragOver && onDragOver(e)}
       onDragLeave={(e) => onDragLeave && onDragLeave(e)}
       onDrop={(e) => onDrop && onDrop(e, item)}
+      style={{ zIndex: showMenu ? 60 : 1 }}
       className={`
         vault-card-interactive group relative flex flex-col rounded-2xl transition-all duration-150 select-none
+        ${showMenu ? "!z-50" : "z-0"}
         ${
           isDragOver
-            ? "bg-accent-primary/20 dark:bg-emerald-950/80 border-2 border-accent-primary dark:border-emerald-400 ring-4 ring-accent-primary/60 shadow-[0_0_50px_rgba(16,185,129,0.9),0_0_100px_rgba(16,185,129,0.5),inset_0_0_30px_rgba(16,185,129,0.35)] scale-[1.06] -translate-y-2 z-30"
+            ? "bg-accent-soft border-2 border-accent-primary ring-4 ring-accent-primary/40 shadow-[0_0_50px_var(--accent-glow)] scale-[1.06] -translate-y-2 z-30"
             : "bg-white dark:bg-vault-surface/80 border border-slate-200/90 dark:border-white/10 shadow-sm hover:shadow-xl dark:hover:shadow-black/60"
         }
-        ${selected && !isDragOver ? `ring-2 ring-accent-primary bg-accent-soft/30 dark:bg-accent-soft/20 border-accent-border shadow-md` : !isDragOver ? "" : ""}
+        ${selected && !isDragOver ? `border border-accent-primary ring-2 ring-accent-primary ring-inset bg-accent-soft/30 dark:bg-accent-soft/20 shadow-lg shadow-accent-glow/20` : !isDragOver ? "" : ""}
         ${isHovered && !selected && !isDragOver ? `border-slate-300 dark:border-white/25 ${envClass}` : ""}
         ${isCut ? "opacity-35" : ""}
         ${isBeingDragged ? "opacity-40 scale-95 border-dashed border-accent-primary/60" : ""}
@@ -501,7 +556,7 @@ export default function AssetCard({
     >
       {/* Exaggerated Glow / Drop Target Overlay for Grid */}
       {isDragOver && (
-        <div className="absolute inset-0 rounded-2xl pointer-events-none border-2 border-dashed border-accent-primary z-40 flex flex-col items-center justify-center bg-accent-primary/15 dark:bg-emerald-950/50 backdrop-blur-[2px] animate-pulse">
+        <div className="absolute inset-0 rounded-2xl pointer-events-none border-2 border-dashed border-accent-primary z-40 flex flex-col items-center justify-center bg-accent-soft/50 backdrop-blur-[2px] animate-pulse">
           <div className="px-4 py-2 rounded-full bg-black/90 border-2 border-accent-primary text-accent-primary text-xs font-mono font-black tracking-widest shadow-[0_0_30px_var(--accent-glow)] flex items-center gap-2 animate-bounce">
             <FolderPlus size={16} />
             <span>DROP TO MOVE</span>
@@ -513,14 +568,9 @@ export default function AssetCard({
       <div className="relative aspect-[4/3] w-full bg-slate-50 dark:bg-black/40 rounded-t-2xl overflow-hidden border-b border-slate-200/70 dark:border-white/5">
         {/* Ambient glow */}
         <div
-          className={`absolute inset-0 opacity-20 bg-gradient-radial to-transparent ${envClass
-            .replace("env-glow-", "from-")
-            .replace("-emerald", "vault-emerald")
-            .replace("-accent", "")
-            .replace("purple", "creative-accent")
-            .replace("orange", "media-accent")
-            .replace("gold", "analytics-accent")
-            .replace("rose", "danger-accent")}`}
+          className={`absolute inset-0 opacity-20 bg-gradient-radial to-transparent ${
+            isTrash ? "from-danger-accent" : "from-accent-primary"
+          }`}
         />
 
         {/* File icon / thumbnail */}
@@ -529,7 +579,7 @@ export default function AssetCard({
             provider === "google_drive" ? (
               <VaultDriveIcon
                 size={48}
-                className="text-document-accent drop-shadow-[0_0_15px_rgba(77,166,255,0.4)]"
+                className="drop-shadow-[0_0_15px_rgba(77,166,255,0.4)]"
               />
             ) : provider === "github" ? (
               <VaultGitIcon
@@ -539,7 +589,7 @@ export default function AssetCard({
             ) : (
               <Folder
                 size={48}
-                className="text-vault-emerald drop-shadow-[0_0_15px_rgba(0,212,165,0.4)]"
+                className="text-accent-primary drop-shadow-[0_0_15px_var(--accent-glow)]"
               />
             )
           ) : item.hasThumbnail && !imageError && thumbSrc ? (
@@ -567,7 +617,7 @@ export default function AssetCard({
         {/* Badges — top-left, always visible */}
         <div className="absolute top-2 left-2 flex items-center gap-1.5 z-10">
           <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-black/60 backdrop-blur-md border border-white/10">
-            <EncryptionBadgeIcon size={12} className="text-vault-emerald" />
+            <EncryptionBadgeIcon size={12} className="text-accent-primary" />
             <span className="text-[10px] font-mono text-white/70">AES-256</span>
           </div>
           {item.vaultWorkspace?.rootDirectoryId && (
@@ -692,7 +742,7 @@ export default function AssetCard({
       {/* ── ⋮ Menu — OUTSIDE overflow:hidden so dropdown never clips ── */}
       <div
         ref={menuRef}
-        className="absolute top-2 right-2 z-30"
+        className="absolute top-2 right-2 z-50"
         onClick={(e) => e.stopPropagation()}
       >
         <button
@@ -712,7 +762,7 @@ export default function AssetCard({
 
         {/* Dropdown — unrestricted, renders from card root level */}
         {showMenu && (
-          <div className="absolute right-0 top-full mt-1.5 w-48 bg-white dark:bg-[#111113] border border-slate-200 dark:border-white/10 rounded-2xl shadow-2xl z-50 p-1.5 overflow-hidden text-slate-900 dark:text-white backdrop-blur-xl animate-fade-in">
+          <div className="absolute right-0 top-full mt-1.5 w-48 bg-white dark:bg-[#111113] border border-slate-200 dark:border-white/10 rounded-2xl shadow-2xl z-[70] p-1.5 overflow-hidden text-slate-900 dark:text-white backdrop-blur-xl animate-fade-in">
             {/* Open / Preview */}
             {!isTrash && (
               <button
@@ -752,7 +802,7 @@ export default function AssetCard({
               </button>
             )}
 
-            {!isTrash && !effectiveReadOnly && !isSpecial && onStarred && (
+            {!isTrash && !isSpecial && onStarred && (
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -762,10 +812,23 @@ export default function AssetCard({
               >
                 <Star
                   size={15}
-                  fill={(item.isStarred || item.starred) ? "#FF7A3D" : "none"}
-                  className={(item.isStarred || item.starred) ? "text-[#FF7A3D] drop-shadow-[0_0_8px_rgba(255,122,61,0.85)]" : "text-slate-400 dark:text-white/60"}
+                  fill={(item.isStarred || item.starred) ? "#F59E0B" : "none"}
+                  className={(item.isStarred || item.starred) ? "text-amber-500 drop-shadow-[0_0_8px_rgba(245,158,11,0.6)]" : "text-slate-400 dark:text-white/60"}
                 />
                 Priority
+              </button>
+            )}
+
+            {canEdit && (
+              <button
+                onClick={() => {
+                  closeMenu();
+                  onEdit(item);
+                }}
+                className="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] font-medium text-slate-700 dark:text-white/80 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/[0.08] transition-colors rounded-xl"
+              >
+                <FileCode size={14} className="shrink-0 text-accent-primary" />
+                Edit File
               </button>
             )}
 
@@ -781,7 +844,7 @@ export default function AssetCard({
                 Rename
               </button>
             )}
-            {!isTrash && !effectiveReadOnly && !isSpecial && onShare && (
+            {!isTrash && !isSpecial && onShare && (
               <button
                 onClick={() => {
                   closeMenu();
@@ -789,7 +852,7 @@ export default function AssetCard({
                 }}
                 className="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] font-medium text-slate-700 dark:text-white/80 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/[0.08] transition-colors rounded-xl"
               >
-                <Share2 size={14} className="shrink-0 text-purple-600 dark:text-purple-400" />
+                <Share2 size={14} className="shrink-0 text-accent-primary" />
                 Share
               </button>
             )}
@@ -814,7 +877,19 @@ export default function AssetCard({
                 className="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] font-medium text-slate-700 dark:text-white/80 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/[0.08] transition-colors rounded-xl"
               >
                 <Scissors size={14} className="shrink-0 text-slate-500 dark:text-white/60" />
-                Cut
+                Cut / Move
+              </button>
+            )}
+            {onMove && (
+              <button
+                onClick={() => {
+                  closeMenu();
+                  onMove(item);
+                }}
+                className="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] font-medium text-slate-700 dark:text-white/80 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/[0.08] transition-colors rounded-xl"
+              >
+                <FolderInput size={14} className="shrink-0 text-slate-500 dark:text-white/60" />
+                Move to Folder...
               </button>
             )}
             {isGithubRepoRoot && item.vaultWorkspace?.rootDirectoryId && (
@@ -934,24 +1009,24 @@ export default function AssetCard({
           </span>
         </div>
         {item.openedAt && (
-          <div className="text-[10px] text-teal-600 dark:text-teal-400 font-mono font-semibold tracking-wide mt-0.5">
+          <div className="text-[10px] text-accent-primary font-mono font-semibold tracking-wide mt-0.5">
             Opened {formatRelativeTime(item.openedAt)}
           </div>
         )}
         <div className="flex items-center gap-2.5 mt-1 flex-wrap">
           <div className="flex items-center gap-1">
-            <div className="status-dot status-dot-emerald" />
+            <div className="status-dot status-dot-accent" />
             <span className="text-[10px] text-slate-500 dark:text-white/50">Encrypted</span>
           </div>
           {(item.isShared || provider !== "local") && (
             <div className="flex items-center gap-1">
-              <div className="status-dot status-dot-purple" />
+              <div className="status-dot status-dot-accent" />
               <span className="text-[10px] text-slate-500 dark:text-white/50">Shared</span>
             </div>
           )}
           {(item.isStarred || item.starred) && (
             <div className="flex items-center gap-1">
-              <div className="status-dot status-dot-orange" />
+              <div className="status-dot status-dot-accent" />
               <span className="text-[10px] text-slate-500 dark:text-white/50">Starred</span>
             </div>
           )}
@@ -967,14 +1042,10 @@ export default function AssetCard({
       {/* ── Selected checkmark ── */}
       {selected && (
         <div
-          className={`absolute -top-2 -right-2 w-6 h-6 rounded-full flex items-center justify-center border-2 border-white/20 dark:border-vault-surface z-10 shadow-lg ${
+          className={`absolute -top-1.5 -right-1.5 w-6 h-6 rounded-full flex items-center justify-center border-2 border-white/90 dark:border-vault-surface z-10 shadow-lg ${
             isTrash
               ? "bg-danger-accent shadow-[0_0_15px_rgba(255,90,122,0.6)] text-white"
-              : provider === "github" || item.name?.toLowerCase() === "github"
-                ? "bg-linkgit-accent shadow-[0_0_15px_rgba(198,92,255,0.6)] text-white"
-                : provider === "google_drive" || provider === "shared_drive" || item.name?.toLowerCase() === "google drive"
-                  ? "bg-[#00CFFF] shadow-[0_0_15px_rgba(0,207,255,0.6)] text-slate-950"
-                  : "bg-accent-primary shadow-accent-glow-sm text-accent-foreground"
+              : "bg-accent-primary shadow-accent-glow-sm text-accent-foreground"
           }`}
         >
           <svg

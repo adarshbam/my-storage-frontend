@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { X, Lock, Key, Calendar, Shield, ShieldAlert, AlertTriangle, Info, Check, Save } from "lucide-react";
 import { SERVER_URL } from "../../lib/api";
 import Button from "../ui/Button";
+import Checkbox from "../ui/Checkbox";
 
 export default function EditLinkModal({ isOpen, onClose, link, onUpdated }) {
   const [title, setTitle] = useState("");
@@ -35,7 +36,7 @@ export default function EditLinkModal({ isOpen, onClose, link, onUpdated }) {
       );
       setMaxDownloads(link.maxDownloads ? String(link.maxDownloads) : "");
       setIsActive(link.isActive !== false);
-      setOwnerAgreed(link.permission && link.permission.includes("owner"));
+      setOwnerAgreed(false);
     }
   }, [link, isOpen]);
 
@@ -152,15 +153,17 @@ export default function EditLinkModal({ isOpen, onClose, link, onUpdated }) {
                 <ShieldAlert size={16} className="shrink-0 mt-0.5" />
                 <span>Grants complete write, delete, and shared external service credentials.</span>
               </div>
-              <label className="flex items-center gap-2 cursor-pointer select-none">
-                <input
-                  type="checkbox"
+              <div className="pt-1">
+                <Checkbox
+                  id="edit-owner-agreed"
                   checked={ownerAgreed}
                   onChange={(e) => setOwnerAgreed(e.target.checked)}
-                  className="rounded border-danger-accent text-danger-accent"
+                  variant="danger"
+                  size="sm"
+                  label="I understand the risk"
+                  labelClassName="text-[10px] font-bold uppercase tracking-wider text-danger-accent"
                 />
-                <span className="text-[10px] font-bold uppercase tracking-wider">I understand the risk</span>
-              </label>
+              </div>
             </div>
           )}
 
@@ -175,7 +178,7 @@ export default function EditLinkModal({ isOpen, onClose, link, onUpdated }) {
                 onClick={() => setAccessType("restricted")}
                 className={`py-2 px-3 rounded-xl text-xs font-semibold border transition-all ${
                   accessType === "restricted"
-                    ? "bg-purple-500/20 text-purple-600 dark:text-purple-300 border-purple-500/40 shadow-[0_0_12px_rgba(168,85,247,0.15)]"
+                    ? "bg-accent-soft text-accent-primary border-accent-border/40 shadow-sm"
                     : "bg-slate-100 dark:bg-black/40 text-slate-600 dark:text-white/40 border-slate-200 dark:border-white/5 hover:border-slate-300 dark:hover:border-white/10"
                 }`}
               >
@@ -202,11 +205,12 @@ export default function EditLinkModal({ isOpen, onClose, link, onUpdated }) {
                 <Lock size={14} className={hasPassword ? "text-amber-500" : "text-slate-400 dark:text-white/40"} />
                 Require Password
               </label>
-              <input
-                type="checkbox"
+              <Checkbox
+                id="edit-has-password"
                 checked={hasPassword}
                 onChange={(e) => setHasPassword(e.target.checked)}
-                className="w-4 h-4 rounded border-slate-300 dark:border-white/20 bg-white dark:bg-black/50 text-amber-500 focus:ring-0"
+                variant="warning"
+                size="sm"
               />
             </div>
 

@@ -50,15 +50,15 @@ export default function PricingLivePreviewSection({
   };
 
   return (
-    <section className="bg-white dark:bg-vault-surface/85 backdrop-blur-2xl border border-slate-200 dark:border-white/10 rounded-3xl p-5 sm:p-8 shadow-xl transition-all duration-300 hover:border-sky-500/30">
+    <section className="bg-white dark:bg-vault-surface/85 backdrop-blur-2xl border border-slate-200 dark:border-white/10 rounded-2xl sm:rounded-3xl p-3.5 min-[360px]:p-5 sm:p-8 shadow-xl transition-all duration-300 hover:border-accent-border">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 sm:mb-8 pb-6 border-b border-slate-200/60 dark:border-white/10">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-sky-500/10 text-sky-400 border border-sky-500/20 flex items-center justify-center shadow-lg shadow-sky-500/5 shrink-0">
-            <Eye size={22} />
+        <div className="flex items-center gap-3 sm:gap-4">
+          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-accent-soft text-accent-primary border border-accent-border flex items-center justify-center shadow-lg shadow-accent-glow-sm shrink-0">
+            <Eye size={20} className="sm:w-[22px] sm:h-[22px]" />
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="text-base min-[360px]:text-lg sm:text-xl font-black text-slate-900 dark:text-white tracking-tight">
                 Live Pricing Component Preview
               </h2>
               <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 uppercase tracking-widest animate-pulse">
@@ -83,11 +83,12 @@ export default function PricingLivePreviewSection({
             Monthly
           </span>
           <button
+            type="button"
             onClick={() => setIsYearly(!isYearly)}
-            className="relative w-12 h-6 bg-slate-300 dark:bg-white/10 rounded-full p-1 flex items-center shadow-inner"
+            className="relative w-12 h-6 bg-slate-300 dark:bg-white/10 rounded-full p-1 flex items-center shadow-inner cursor-pointer"
           >
             <motion.div
-              className="w-4 h-4 rounded-full bg-gradient-to-r from-[#14b8a6] to-[#0ea5e9]"
+              className="w-4 h-4 rounded-full bg-accent-primary shadow-sm shadow-accent-glow"
               animate={{ x: isYearly ? 24 : 0 }}
               transition={{ type: "spring", stiffness: 500, damping: 30 }}
             />
@@ -105,7 +106,7 @@ export default function PricingLivePreviewSection({
       </div>
 
       {/* Embedded Live Preview Canvas */}
-      <div className="w-full bg-slate-950/80 dark:bg-[#020705] p-6 md:p-8 rounded-[2.5rem] border border-slate-800 dark:border-white/10 relative overflow-hidden shadow-2xl space-y-6">
+      <div className="w-full bg-slate-100 dark:bg-vault-base/90 p-6 md:p-8 rounded-[2.5rem] border border-slate-200 dark:border-white/10 relative overflow-hidden shadow-2xl space-y-6">
         {(() => {
           const period = isYearly ? "Yearly" : "Monthly";
           const freeTrialTier = planTiers.find(
@@ -151,7 +152,7 @@ export default function PricingLivePreviewSection({
                 return (
                   <div
                     key={freeTrialTier.slug}
-                    className="relative rounded-3xl p-5 sm:p-7 border border-accent-border/40 bg-accent-soft/20 dark:bg-accent-soft/10 flex flex-col xl:flex-row xl:items-center justify-between gap-5 transition-all duration-300 shadow-lg shadow-accent-glow/10"
+                    className="relative rounded-2xl sm:rounded-3xl p-4 min-[360px]:p-5 sm:p-7 border border-accent-border/40 bg-accent-soft/20 dark:bg-accent-soft/10 flex flex-col xl:flex-row xl:items-center justify-between gap-5 transition-all duration-300 shadow-lg shadow-accent-glow/10"
                   >
                     {/* Left Info: Badge, Title, Description, Price */}
                     <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6 min-w-0">
@@ -163,7 +164,7 @@ export default function PricingLivePreviewSection({
                             </span>
                           </div>
                         )}
-                        <h3 className="text-2xl font-black text-slate-900 dark:text-white truncate">
+                        <h3 className="text-xl min-[360px]:text-2xl font-black text-slate-900 dark:text-white truncate">
                           {freeTrialTier.title}
                         </h3>
                         <p className="text-xs text-slate-600 dark:text-white/50 font-medium mt-1">
@@ -173,7 +174,7 @@ export default function PricingLivePreviewSection({
 
                       {/* Price Display */}
                       <div className="sm:border-l sm:border-slate-200 dark:sm:border-white/10 sm:pl-6 flex items-baseline gap-1 shrink-0">
-                        <span className="text-3xl sm:text-4xl font-black text-slate-900 dark:text-white">
+                        <span className="text-2xl min-[360px]:text-3xl sm:text-4xl font-black text-slate-900 dark:text-white">
                           {symbol}0
                         </span>
                         <span className="text-xs text-slate-500 dark:text-white/40 font-semibold">
@@ -233,31 +234,34 @@ export default function PricingLivePreviewSection({
                   const tierRules = tierRuleConfigs[tier.slug] || {};
                   const symbol = currencySymbols[planObj.currency] || planObj.currency + " ";
                   const storageText = formatStorageText(planObj.storage);
-                  const isPopular = tier.badge === "Most Popular" || tier.slug?.includes("pro");
+                  const isPopular =
+                    tier.isPopular !== undefined
+                      ? Boolean(tier.isPopular)
+                      : tier.badge === "Most Popular" || tier.slug?.includes("pro");
 
                   return (
                     <div
                       key={tier.slug}
-                      className={`relative rounded-3xl p-6 md:p-7 border flex flex-col justify-between transition-all duration-300 ${
+                      className={`relative rounded-2xl sm:rounded-3xl p-4 min-[360px]:p-5 md:p-7 border flex flex-col justify-between transition-all duration-300 ${
                         isPopular
                           ? "border-accent-primary shadow-2xl shadow-accent-glow/20 ring-2 ring-accent-border/50 bg-white/90 dark:bg-vault-surface/90"
                           : "border-slate-200 dark:border-white/10 bg-white/80 dark:bg-vault-surface/60 hover:border-accent-border/80 hover:shadow-xl hover:shadow-accent-glow/10"
                       }`}
                     >
                       {/* Badge */}
-                      {tier.badge && (
+                      {(isPopular || (tier.badge && tier.badge.toLowerCase() !== "most popular")) && (
                         <div className="mb-3">
                           <span
                             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-accent-primary text-accent-foreground shadow-accent-glow-sm"
                           >
-                            <Sparkles size={10} /> {tier.badge}
+                            <Sparkles size={10} /> {isPopular ? "Most Popular" : tier.badge}
                           </span>
                         </div>
                       )}
 
                       <div className="flex-1 flex flex-col">
                         {/* Title & Subtitle */}
-                        <h3 className="text-2xl font-black text-slate-900 dark:text-white mb-1">
+                        <h3 className="text-xl min-[360px]:text-2xl font-black text-slate-900 dark:text-white mb-1">
                           {tier.title}
                         </h3>
                         <p className="text-xs text-slate-600 dark:text-white/50 font-medium mb-4 min-h-[32px]">
@@ -266,7 +270,7 @@ export default function PricingLivePreviewSection({
 
                         {/* Price Display */}
                         <div className="flex items-baseline gap-1 mb-5 pb-5 border-b border-slate-200 dark:border-white/10">
-                          <span className="text-4xl font-black text-slate-900 dark:text-white">
+                          <span className="text-2xl min-[360px]:text-3xl sm:text-4xl font-black text-slate-900 dark:text-white">
                             {symbol}
                             {planObj.amount}
                           </span>

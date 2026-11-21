@@ -11,15 +11,16 @@ const features = [
 
 export default function AuthLayout({ children }) {
   return (
-    <div className="min-h-[100dvh] flex items-center justify-center relative overflow-hidden bg-vault-bg p-3 sm:p-6 lg:p-8 transition-colors duration-300">
-      {/* Ambient glows */}
+    <div className="min-h-[100dvh] w-full flex items-center justify-center relative overflow-hidden bg-vault-bg p-2.5 min-[360px]:p-3 sm:p-6 lg:p-8 transition-colors duration-300">
+      {/* Ambient glows matching Homepage formula */}
       <div className="fixed inset-0 z-[0] pointer-events-none overflow-hidden">
-        <div className="absolute top-[-20%] left-[-15%] w-[50vw] h-[50vw] bg-accent-soft rounded-full blur-[140px] opacity-70" />
-        <div className="absolute bottom-[-20%] right-[-15%] w-[40vw] h-[40vw] bg-accent-glow rounded-full blur-[140px] opacity-30" />
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[85vw] h-[55vh] bg-[radial-gradient(ellipse_at_top,rgba(var(--accent-primary-rgb),0.13)_0%,rgba(var(--accent-primary-rgb),0.035)_45%,transparent_75%)] dark:bg-[radial-gradient(ellipse_at_top,rgba(var(--accent-primary-rgb),0.10)_0%,rgba(var(--accent-primary-rgb),0.025)_45%,transparent_75%)]" />
+        <div className="absolute top-[10%] left-1/2 -translate-x-1/2 w-[70vw] h-[45vh] bg-accent-soft rounded-full blur-[140px] opacity-70" />
+        <div className="absolute bottom-[-5%] right-[10%] w-[35vw] h-[35vw] bg-accent-glow rounded-full blur-[130px] opacity-25" />
       </div>
 
       {/* Frame */}
-      <div className="w-full max-w-[1100px] min-h-0 sm:min-h-[560px] lg:min-h-[600px] bg-white/80 dark:bg-vault-surface/80 backdrop-blur-2xl border border-slate-200 dark:border-white/10 shadow-2xl rounded-3xl lg:rounded-[2.5rem] flex overflow-hidden relative z-10 transition-all duration-300">
+      <div className="w-full max-w-[1100px] min-w-0 min-h-0 sm:min-h-[560px] lg:min-h-[600px] bg-white/80 dark:bg-vault-surface/80 backdrop-blur-2xl border border-slate-200 dark:border-white/10 shadow-2xl rounded-3xl lg:rounded-[2.5rem] flex overflow-hidden relative z-10 transition-all duration-300">
         {/* Left Promo Panel */}
         <div className="hidden lg:flex lg:w-[46%] relative bg-slate-900 dark:bg-black/50 border-r border-slate-200 dark:border-white/10 overflow-hidden text-white">
           <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_at_top,var(--accent-soft)_0%,transparent_70%)] pointer-events-none" />
@@ -85,8 +86,8 @@ export default function AuthLayout({ children }) {
         </div>
 
         {/* Right Form Panel */}
-        <div className="flex-1 flex items-center justify-center relative p-4 sm:p-8 md:p-12 py-6 sm:py-10">
-          <div className="w-full max-w-[380px] relative z-10">{children}</div>
+        <div className="flex-1 min-w-0 w-full flex items-center justify-center relative p-3 min-[360px]:p-4 sm:p-8 md:p-12 py-5 min-[360px]:py-6 sm:py-10">
+          <div className="w-full max-w-[380px] min-w-0 relative z-10">{children}</div>
         </div>
       </div>
     </div>

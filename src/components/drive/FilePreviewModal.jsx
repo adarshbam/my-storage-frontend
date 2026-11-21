@@ -17,10 +17,12 @@ import {
   WrapText,
   FileVideo,
   History,
+  ExternalLink,
 } from "lucide-react";
 import { SERVER_URL } from "../../lib/api";
 import { getFileCdnUrl } from "../../api/files.api";
 import Button from "../ui/Button";
+import VideoPlayer from "./VideoPlayer";
 import Editor from "react-simple-code-editor";
 import { usePlan } from "../../context/PlanContext";
 import FilePreviewSkeleton from "./FilePreviewSkeleton";
@@ -185,12 +187,14 @@ export default function FilePreviewModal({
   ownerId,
   selectedBranch,
   onViewHistory,
+  initialEditMode = false,
 }) {
   const { isNoPlan, rules } = usePlan();
   const allowEdit = !isNoPlan && (rules?.permissions?.allowUpload ?? true);
 
   // Check cache immediately on state initialization for instant 0ms mount
-  const initialCached = file?._id ? getCachedContent(file._id) : null;
+  const fileCacheKey = file?.sha || file?._id || file?.githubPath;
+  const initialCached = fileCacheKey ? getCachedContent(fileCacheKey) : null;
 
   const [content, setContent] = useState(initialCached);
   const [editedContent, setEditedContent] = useState(initialCached || "");
@@ -214,7 +218,12 @@ export default function FilePreviewModal({
     if (file?.sha) setCurrentSha(file.sha);
     if (file?.name) setTempName(file.name);
     setImgLoaded(false);
-  }, [file]);
+    if (initialEditMode && allowEdit) {
+      setIsEditing(true);
+    } else {
+      setIsEditing(false);
+    }
+  }, [file, initialEditMode, allowEdit, isOpen]);
 
   const handleRenameSubmit = async () => {
     if (!tempName.trim() || tempName === file.name) {
@@ -391,7 +400,8 @@ export default function FilePreviewModal({
       } else {
         // External provider (GitHub or Google Drive)
         if (isText) {
-          const cached = getCachedContent(file._id);
+          const externalCacheKey = file?.sha || file?._id || file?.githubPath;
+          const cached = externalCacheKey ? getCachedContent(externalCacheKey) : null;
           if (cached !== null) {
             setContent(cached);
             setEditedContent(cached);
@@ -425,7 +435,9 @@ export default function FilePreviewModal({
 
             if (abortController.signal.aborted) return;
 
-            setCachedContent(file._id, text);
+            if (externalCacheKey) {
+              setCachedContent(externalCacheKey, text);
+            }
 
             setContent(text);
             setEditedContent(text);
@@ -539,6 +551,7 @@ export default function FilePreviewModal({
       setContent(editedContent);
       setIsEditing(false);
       setSaveSuccess(true);
+      window.dispatchEvent(new CustomEvent("vault:refresh"));
       setTimeout(() => setSaveSuccess(false), 2000);
     } catch (err) {
       console.error(err);
@@ -687,14 +700,18 @@ export default function FilePreviewModal({
       if (loading) {
         return <FilePreviewSkeleton type="video" />;
       }
+      const directStreamFallback = isVaultStorage
+        ? `${SERVER_URL}/file/${file._id}${ownerId ? `?ownerId=${ownerId}` : ""}`
+        : undefined;
+
       return (
-        <div className="flex items-center justify-center h-full bg-slate-950/50 rounded-2xl overflow-hidden border border-white/5">
+        <div className="w-full h-full flex items-center justify-center bg-black overflow-hidden relative">
           {previewSrc ? (
-            <video
+            <VideoPlayer
               src={previewSrc}
-              controls
-              className="max-w-full max-h-full rounded-lg"
+              fallbackSrc={directStreamFallback}
               crossOrigin={isVaultStorage ? undefined : "use-credentials"}
+              title={file.name}
               onError={() => setError("This video file could not be found or failed to stream.")}
             />
           ) : (
@@ -863,23 +880,54 @@ export default function FilePreviewModal({
     );
   };
 
+  const isVideoFile = isVideo(getFileExt(file));
+
   return (
     <div
-      className={`fixed inset-0 z-[10000] flex items-center justify-center bg-slate-950/80 backdrop-blur-xl animate-in fade-in duration-200 ${
-        isFullscreen ? "p-0" : "p-2 sm:p-6"
+      className={`fixed inset-0 z-[10000] flex items-center justify-center animate-in fade-in duration-200 ${
+        isVideoFile
+          ? "bg-black/95 p-0 sm:p-4"
+          : `bg-slate-950/80 backdrop-blur-xl ${isFullscreen ? "p-0" : "p-2 sm:p-6"}`
       }`}
     >
       {!isFullscreen && <div className="absolute inset-0" onClick={onClose} />}
       <div
         ref={modalRef}
-        className={`relative bg-white/95 dark:bg-[#0c0c0e]/95 backdrop-blur-2xl shadow-[0_25px_80px_rgba(0,0,0,0.35)] dark:shadow-[0_30px_90px_rgba(0,0,0,0.9),0_0_35px_var(--accent-glow)] flex flex-col border border-slate-200/90 dark:border-white/10 overflow-hidden animate-in zoom-in-95 duration-150 transition-all ${
-          isFullscreen
-            ? "w-full h-full rounded-none"
-            : "w-full max-w-6xl h-[92dvh] sm:h-[85vh] rounded-2xl sm:rounded-3xl"
+        className={`relative flex flex-col overflow-hidden animate-in zoom-in-95 duration-150 transition-all ${
+          isVideoFile
+            ? `bg-black text-white border border-white/10 shadow-2xl ${
+                isFullscreen
+                  ? "w-full h-full rounded-none"
+                  : "w-full max-w-6xl h-[92dvh] sm:h-[88vh] rounded-2xl sm:rounded-3xl"
+              }`
+            : `bg-white/95 dark:bg-[#0c0c0e]/95 backdrop-blur-2xl shadow-[0_25px_80px_rgba(0,0,0,0.35)] dark:shadow-[0_30px_90px_rgba(0,0,0,0.9),0_0_35px_var(--accent-glow)] border border-slate-200/90 dark:border-white/10 ${
+                isFullscreen
+                  ? "w-full h-full rounded-none"
+                  : "w-full max-w-6xl h-[92dvh] sm:h-[85vh] rounded-2xl sm:rounded-3xl"
+              }`
         }`}
+        style={
+          isVideoFile
+            ? { contain: "paint", transform: "translateZ(0)" }
+            : undefined
+        }
       >
+        {/* Subtle Ambient Top Theme Aura (matches Homepage atmosphere) */}
+        {!isVideoFile && (
+          <>
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-[180px] bg-[radial-gradient(ellipse_at_top,rgba(var(--accent-primary-rgb),0.14)_0%,transparent_70%)] dark:bg-[radial-gradient(ellipse_at_top,rgba(var(--accent-primary-rgb),0.10)_0%,transparent_70%)] pointer-events-none rounded-t-3xl z-0" />
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[70%] h-[100px] bg-accent-soft rounded-full blur-[70px] opacity-60 pointer-events-none z-0" />
+          </>
+        )}
+
         {/* Header */}
-        <div className="flex items-center justify-between px-3 sm:px-6 py-3 sm:py-4 border-b border-slate-200 dark:border-white/10 bg-slate-50/70 dark:bg-white/[0.03] shrink-0 gap-2">
+        <div
+          className={`flex items-center justify-between px-3 sm:px-6 py-3 sm:py-3.5 shrink-0 gap-2 relative z-10 ${
+            isVideoFile
+              ? "bg-[#0d0d10] border-b border-white/10 text-white"
+              : "border-b border-slate-200 dark:border-white/10 bg-slate-50/70 dark:bg-white/[0.03]"
+          }`}
+        >
           <div className="flex items-center gap-2 sm:gap-3.5 min-w-0 overflow-hidden">
             <div className="p-2 sm:p-2.5 bg-accent-soft border border-accent-border rounded-xl sm:rounded-2xl text-accent-primary shrink-0 shadow-sm shadow-accent-glow/10">
               {(() => {
@@ -956,7 +1004,7 @@ export default function FilePreviewModal({
             </div>
           </div>
           <div className="flex items-center gap-1 sm:gap-2 shrink-0 flex-wrap justify-end">
-            {isTextOrCode(file.extension) && !loading && (
+            {isTextOrCode(getFileExt(file), file.name) && !loading && (
               <>
                 {!isEditing && (
                   <Button
@@ -1020,12 +1068,28 @@ export default function FilePreviewModal({
                 <span className="hidden sm:inline text-xs">History</span>
               </Button>
             )}
+            {(file.metaUrl || file.webViewLink) && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => window.open(file.metaUrl || file.webViewLink, "_blank")}
+                title="Open in Google Drive"
+                className="text-slate-600 dark:text-white/70 hover:text-accent-primary flex items-center gap-1.5 font-bold"
+              >
+                <ExternalLink size={16} />
+                <span className="hidden sm:inline text-xs">Drive</span>
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="sm"
               onClick={toggleFullscreen}
               title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
-              className="text-slate-600 dark:text-white/70 hover:text-slate-900 dark:hover:text-white"
+              className={
+                isVideoFile
+                  ? "text-white/80 hover:text-white hover:bg-white/10"
+                  : "text-slate-600 dark:text-white/70 hover:text-slate-900 dark:hover:text-white"
+              }
             >
               {isFullscreen ? <Minimize size={18} /> : <Maximize size={18} />}
             </Button>
@@ -1034,13 +1098,21 @@ export default function FilePreviewModal({
               size="sm"
               onClick={handleDownload}
               title="Download"
-              className="text-slate-600 dark:text-white/70 hover:text-slate-900 dark:hover:text-white"
+              className={
+                isVideoFile
+                  ? "text-white/80 hover:text-white hover:bg-white/10"
+                  : "text-slate-600 dark:text-white/70 hover:text-slate-900 dark:hover:text-white"
+              }
             >
               <Download size={18} />
             </Button>
             <button
               onClick={onClose}
-              className="p-2 text-slate-400 hover:text-slate-800 dark:hover:text-white rounded-xl hover:bg-slate-100 dark:hover:bg-white/10 transition-colors"
+              className={`p-2 rounded-xl transition-colors ${
+                isVideoFile
+                  ? "text-white/70 hover:text-white hover:bg-white/10"
+                  : "text-slate-400 hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10"
+              }`}
             >
               <X size={18} />
             </button>
@@ -1049,8 +1121,12 @@ export default function FilePreviewModal({
 
         {/* Content */}
         <div
-          className={`flex-1 overflow-auto bg-slate-100/70 dark:bg-black/40 ${
-            isPdf(file.extension) ? "p-0 overflow-hidden" : "p-4 md:p-6"
+          className={`flex-1 ${
+            isVideoFile
+              ? "p-0 overflow-hidden bg-black flex items-center justify-center"
+              : isPdf(getFileExt(file))
+                ? "p-0 overflow-hidden bg-slate-100/70 dark:bg-black/40"
+                : "p-4 md:p-6 overflow-auto bg-slate-100/70 dark:bg-black/40"
           }`}
         >
           {renderContent()}

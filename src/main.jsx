@@ -4,6 +4,30 @@ import "./index.css";
 import App from "./App.jsx";
 import { GoogleOAuthProvider } from "@react-oauth/google";
 
+// 🛡️ Suppress benign Google Identity Services / OAuth COOP popup polling warning
+if (typeof window !== "undefined") {
+  const isCoopWarning = (arg) => {
+    if (!arg) return false;
+    const str = typeof arg === "string" ? arg : (arg.message || String(arg));
+    return (
+      str.includes("Cross-Origin-Opener-Policy") &&
+      (str.includes("window.closed") || str.includes("window.close") || str.includes("window.postMessage"))
+    );
+  };
+
+  const origError = console.error;
+  console.error = function (...args) {
+    if (args.some(isCoopWarning)) return;
+    origError.apply(console, args);
+  };
+
+  const origWarn = console.warn;
+  console.warn = function (...args) {
+    if (args.some(isCoopWarning)) return;
+    origWarn.apply(console, args);
+  };
+}
+
 // 🔒 Professional Security Hardening: Self-XSS Console Warning (Discord-style brand matching)
 console.log(
   "%cWait!",

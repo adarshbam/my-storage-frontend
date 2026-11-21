@@ -59,7 +59,7 @@ export default function StandaloneNavbar() {
     try {
       const response = await fetch(`${SERVER_URL}/user/profilepic`, {
         method: "POST",
-        headers: { filename: file.name },
+        headers: { filename: encodeURIComponent(file.name) },
         body: file,
         credentials: "include",
       });
@@ -71,7 +71,11 @@ export default function StandaloneNavbar() {
         if (userRes.ok) {
           const newUser = await userRes.json();
           setUser(newUser);
+          window.dispatchEvent(new CustomEvent("auth:refresh"));
         }
+      } else {
+        const errData = await response.json().catch(() => ({}));
+        console.error("Failed to upload profile picture:", errData);
       }
     } catch (err) {
       console.error("Error uploading profile pic", err);
@@ -95,20 +99,17 @@ export default function StandaloneNavbar() {
       path: "/dashboard/billing",
       aliases: ["/billing"],
       icon: HardDrive,
-      accentColor: "#10B981",
     },
     {
       name: "Account Settings",
       path: "/profile",
       icon: User,
-      accentColor: "#4DA6FF",
     },
     {
       name: "Wally's Academy",
       path: "/dashboard/tutorials",
       aliases: ["/tutorials"],
       icon: Sparkles,
-      accentColor: "#00CFFF",
     },
     ...(isManagerOrAdmin
       ? [
@@ -116,7 +117,6 @@ export default function StandaloneNavbar() {
             name: "User Management",
             path: "/users",
             icon: Shield,
-            accentColor: "#F43F5E",
           },
         ]
       : []),
@@ -126,7 +126,6 @@ export default function StandaloneNavbar() {
             name: "Owner Settings",
             path: "/owner/settings",
             icon: Sliders,
-            accentColor: "#A855F7",
           },
         ]
       : []),
@@ -136,10 +135,18 @@ export default function StandaloneNavbar() {
     if (item.exact) {
       return location.pathname === item.path;
     }
-    if (location.pathname === item.path || location.pathname.startsWith(`${item.path}/`)) {
+    if (
+      location.pathname === item.path ||
+      location.pathname.startsWith(`${item.path}/`)
+    ) {
       return true;
     }
-    if (item.aliases && item.aliases.some((a) => location.pathname === a || location.pathname.startsWith(`${a}/`))) {
+    if (
+      item.aliases &&
+      item.aliases.some(
+        (a) => location.pathname === a || location.pathname.startsWith(`${a}/`),
+      )
+    ) {
       return true;
     }
     return false;
@@ -148,16 +155,16 @@ export default function StandaloneNavbar() {
   return (
     <header className="h-[64px] shrink-0 bg-white/95 dark:bg-vault-surface/95 backdrop-blur-3xl border-b border-slate-200 dark:border-white/10 z-50 flex items-center justify-between px-3 sm:px-6 sticky top-0 shadow-sm transition-colors duration-200">
       {/* LEFT: Logo & Quick Return to Vault */}
-      <div className="flex items-center gap-2 sm:gap-4 shrink-0">
+      <div className="flex items-center gap-1.5 sm:gap-4 shrink-0 min-w-0">
         <Link
           to="/"
-          className="flex items-center gap-2.5 group"
+          className="flex items-center gap-2 group shrink-0"
           title="Go to Home"
         >
           <div className="bg-accent-soft border border-accent-border p-1.5 rounded-xl shadow-sm group-hover:border-accent-primary transition-colors">
             <VaultLogo className="text-accent-primary" size={18} />
           </div>
-          <span className="text-base sm:text-lg font-black tracking-widest text-slate-900 dark:text-white uppercase hidden xs:inline-block">
+          <span className="text-base sm:text-lg font-black tracking-widest text-slate-900 dark:text-white uppercase hidden min-[420px]:inline-block">
             Vault OS
           </span>
         </Link>
@@ -165,7 +172,7 @@ export default function StandaloneNavbar() {
         {/* Back to Vault quick button */}
         <Link
           to="/dashboard"
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-700 dark:text-white/80 hover:text-slate-900 dark:hover:text-white border border-slate-200 dark:border-white/10 text-xs font-bold transition-all ml-1"
+          className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-700 dark:text-white/80 hover:text-slate-900 dark:hover:text-white border border-slate-200 dark:border-white/10 text-xs font-bold transition-all shrink-0"
           title="Back to Vault files"
         >
           <ArrowLeft size={13} />
@@ -191,7 +198,11 @@ export default function StandaloneNavbar() {
             >
               <Icon
                 size={14}
-                className={active ? "text-accent-primary" : "text-slate-400 dark:text-white/40"}
+                className={
+                  active
+                    ? "text-accent-primary"
+                    : "text-slate-400 dark:text-white/40"
+                }
               />
               <span>{item.name}</span>
             </Link>
@@ -251,7 +262,9 @@ export default function StandaloneNavbar() {
                 >
                   <div
                     className={`w-8 h-8 rounded-xl flex items-center justify-center ${
-                      active ? "bg-accent-primary text-accent-foreground" : "bg-slate-200 dark:bg-white/10 text-slate-500 dark:text-white/50"
+                      active
+                        ? "bg-accent-primary text-accent-foreground"
+                        : "bg-slate-200 dark:bg-white/10 text-slate-500 dark:text-white/50"
                     }`}
                   >
                     <Icon size={16} />

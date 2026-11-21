@@ -80,28 +80,26 @@ export const isSpecialFolder = (item, specialView = null) => {
   if (!item) return false;
   if (item.isExternalIntegration) return true;
 
-  // When browsing inside an external integration view, items inside are regular files/folders
+  // When browsing inside external integration views or special operational views (starred, recent, shared), items are interactive
   if (
     specialView === "google-drive" ||
     specialView === "google-drive-folder" ||
     specialView === "github" ||
-    specialView === "github-repo"
+    specialView === "github-repo" ||
+    specialView === "starred" ||
+    specialView === "recent" ||
+    specialView === "shared"
   ) {
     return false;
   }
 
-  const provider = item.provider || "local";
   const name = (item.name || "").trim().toLowerCase();
 
-  // Root integration mount points shown on the Vault surface
+  // Only root synthetic integration mount points shown on the Vault root surface are special
   if (
     name === "github" ||
     name === "google drive" ||
-    name === "dropbox" ||
-    provider === "google_drive" ||
-    provider === "github" ||
-    provider === "dropbox" ||
-    provider === "shared_drive"
+    name === "dropbox"
   ) {
     return true;
   }
@@ -126,9 +124,26 @@ export const getProfilePicUrl = (profilepic) => {
   ) {
     return str;
   }
-  if (str.startsWith("/user/profilepic") || str.startsWith("user/profilepic")) {
-    return `${SERVER_URL}${str.startsWith("/") ? "" : "/"}${str}`;
+
+  // Prevent double-wrapping if the string is already a profilepic endpoint URL
+  if (str.includes("/user/profilepic")) {
+    let decoded = str;
+    try {
+      decoded = decodeURIComponent(str);
+    } catch {}
+    const idMatch = decoded.match(/id=([0-9a-fA-F]{24})/);
+    if (idMatch) {
+      return `${SERVER_URL}/user/profilepic?id=${idMatch[1]}`;
+    }
+    if (SERVER_URL && str.startsWith(SERVER_URL)) {
+      return str;
+    }
+    if (str.startsWith("/user/profilepic") || str.startsWith("user/profilepic")) {
+      return `${SERVER_URL}${str.startsWith("/") ? "" : "/"}${str}`;
+    }
+    return str;
   }
+
   return `${SERVER_URL}/user/profilepic?id=${encodeURIComponent(str)}`;
 };
 

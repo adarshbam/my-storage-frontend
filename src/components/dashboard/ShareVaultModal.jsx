@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { SERVER_URL } from "../../lib/api";
 import Button from "../ui/Button";
+import Checkbox from "../ui/Checkbox";
 import { usePlan } from "../../context/PlanContext";
 
 export default function ShareVaultModal({ isOpen, onClose, items = [] }) {
@@ -144,6 +145,8 @@ export default function ShareVaultModal({ isOpen, onClose, items = [] }) {
             name: item.name,
             size: item.size || 0,
             extension: item.extension || "",
+            githubPath: item.githubPath || "",
+            metaUrl: item.metaUrl || item.webViewLink || item.url || "",
           })),
         }),
         credentials: "include",
@@ -198,28 +201,31 @@ export default function ShareVaultModal({ isOpen, onClose, items = [] }) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-4">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-2.5 sm:p-4">
       <div
         className="fixed inset-0 bg-black/85 backdrop-blur-md"
         onClick={onClose}
       />
-      <div className="relative z-10 w-full max-w-3xl bg-white dark:bg-vault-surface text-slate-900 dark:text-white border border-slate-200 dark:border-white/10 rounded-3xl p-5 sm:p-8 shadow-2xl max-h-[90dvh] sm:max-h-[88vh] overflow-y-auto custom-scrollbar">
+      <div className="relative z-10 w-full max-w-3xl bg-white dark:bg-vault-surface text-slate-900 dark:text-white border border-slate-200 dark:border-white/10 rounded-2xl sm:rounded-3xl p-4 sm:p-8 shadow-2xl max-h-[90dvh] sm:max-h-[88vh] overflow-y-auto custom-scrollbar overflow-hidden">
+        {/* Subtle Ambient Top Theme Aura (matches Homepage atmosphere) */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-[180px] bg-[radial-gradient(ellipse_at_top,rgba(var(--accent-primary-rgb),0.14)_0%,transparent_70%)] dark:bg-[radial-gradient(ellipse_at_top,rgba(var(--accent-primary-rgb),0.10)_0%,transparent_70%)] pointer-events-none rounded-t-3xl z-0" />
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[70%] h-[100px] bg-accent-soft rounded-full blur-[70px] opacity-60 pointer-events-none z-0" />
         
         {/* Close Button */}
         <button
           onClick={onClose}
-          className="absolute top-5 right-5 p-2 text-slate-400 hover:text-slate-900 dark:hover:text-white bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 rounded-xl transition-all"
+          className="absolute top-4 right-4 sm:top-5 sm:right-5 p-2 text-slate-400 hover:text-slate-900 dark:hover:text-white bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 rounded-xl transition-all z-20 cursor-pointer"
         >
           <X size={18} />
         </button>
 
         {/* Header */}
-        <div className="flex items-center gap-3 mb-2">
-          <div className="p-2.5 bg-accent-soft text-accent-primary rounded-2xl border border-accent-border shadow-accent-glow-sm">
-            <Share2 size={24} />
+        <div className="flex items-center gap-2.5 sm:gap-3 mb-2 pr-12">
+          <div className="p-2 sm:p-2.5 bg-accent-soft text-accent-primary rounded-xl sm:rounded-2xl border border-accent-border shadow-accent-glow-sm shrink-0">
+            <Share2 size={20} className="sm:w-6 sm:h-6" />
           </div>
-          <div>
-            <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white uppercase">
+          <div className="min-w-0">
+            <h2 className="text-base sm:text-xl font-bold tracking-tight text-slate-900 dark:text-white uppercase break-words">
               {selectedItems.length > 0 ? "Share Selected Items" : "Share Entire Vault"}
             </h2>
           </div>
@@ -373,17 +379,17 @@ export default function ShareVaultModal({ isOpen, onClose, items = [] }) {
                   <ShieldAlert size={16} className="shrink-0 mt-0.5" />
                   <span>Full control + shared Google Drive & GitHub credentials.</span>
                 </div>
-                <label className="flex items-center gap-2 cursor-pointer select-none bg-black/30 p-2 rounded-lg border border-danger-accent/20">
-                  <input
-                    type="checkbox"
+                <div className="bg-black/30 p-2 rounded-lg border border-danger-accent/20">
+                  <Checkbox
+                    id="owner-agreed"
                     checked={ownerAgreed}
                     onChange={(e) => setOwnerAgreed(e.target.checked)}
-                    className="rounded border-danger-accent text-danger-accent"
+                    variant="danger"
+                    size="sm"
+                    label="I understand the risk"
+                    labelClassName="text-[10px] font-bold uppercase tracking-wider text-danger-accent"
                   />
-                  <span className="text-[10px] font-bold uppercase tracking-wider">
-                    I understand the risk
-                  </span>
-                </label>
+                </div>
               </div>
             )}
 
@@ -392,11 +398,11 @@ export default function ShareVaultModal({ isOpen, onClose, items = [] }) {
               <label className="block text-[11px] font-bold tracking-wider uppercase text-slate-500 dark:text-white/40 mb-1 font-mono">
                 Access Mode
               </label>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 min-[360px]:grid-cols-2 gap-2">
                 <button
                   type="button"
                   onClick={() => setAccessType("public")}
-                  className={`py-1.5 px-3 rounded-xl text-xs font-semibold border transition-all flex items-center justify-center gap-1.5 ${
+                  className={`py-2 px-3 rounded-xl text-xs font-semibold border transition-all flex items-center justify-center gap-1.5 ${
                     accessType === "public"
                       ? "bg-cyan-500/20 text-cyan-600 dark:text-cyan-300 border-cyan-500/40"
                       : "bg-slate-100 dark:bg-black/30 text-slate-600 dark:text-white/40 border-slate-200 dark:border-white/5 hover:border-slate-300 dark:hover:border-white/10"
@@ -408,9 +414,9 @@ export default function ShareVaultModal({ isOpen, onClose, items = [] }) {
                 <button
                   type="button"
                   onClick={() => setAccessType("restricted")}
-                  className={`py-1.5 px-3 rounded-xl text-xs font-semibold border transition-all flex items-center justify-center gap-1.5 ${
+                  className={`py-2 px-3 rounded-xl text-xs font-semibold border transition-all flex items-center justify-center gap-1.5 ${
                     accessType === "restricted"
-                      ? "bg-purple-500/20 text-purple-600 dark:text-purple-300 border-purple-500/40"
+                      ? "bg-accent-soft text-accent-primary border-accent-border/40 shadow-sm"
                       : "bg-slate-100 dark:bg-black/30 text-slate-600 dark:text-white/40 border-slate-200 dark:border-white/5 hover:border-slate-300 dark:hover:border-white/10"
                   }`}
                 >
@@ -432,12 +438,13 @@ export default function ShareVaultModal({ isOpen, onClose, items = [] }) {
                     </span>
                   )}
                 </label>
-                <input
-                  type="checkbox"
+                <Checkbox
+                  id="has-password"
                   disabled={!hasFeature("password_links")}
                   checked={hasPassword && hasFeature("password_links")}
                   onChange={(e) => setHasPassword(e.target.checked)}
-                  className="w-4 h-4 rounded border-slate-300 dark:border-white/20 bg-white dark:bg-black/50 text-amber-500 disabled:opacity-40"
+                  variant="warning"
+                  size="sm"
                 />
               </div>
 
@@ -480,12 +487,12 @@ export default function ShareVaultModal({ isOpen, onClose, items = [] }) {
                   Link Expiration
                 </label>
                 {!hasFeature("expiring_links") && (
-                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20 uppercase font-mono">
+                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-500 border border-amber-500/20 uppercase font-mono">
                     Upgrade Required
                   </span>
                 )}
               </div>
-              <div className="grid grid-cols-3 gap-1.5 mb-2">
+              <div className="grid grid-cols-2 min-[360px]:grid-cols-3 gap-1.5 mb-2">
                 {[
                   { id: "never", label: "Never", requiresFeature: false },
                   { id: "24h", label: "24 Hours", requiresFeature: true },
@@ -500,7 +507,7 @@ export default function ShareVaultModal({ isOpen, onClose, items = [] }) {
                       type="button"
                       disabled={isDisabled}
                       onClick={() => !isDisabled && setExpiryPreset(preset.id)}
-                      className={`py-1.5 px-2.5 rounded-xl text-[11px] font-semibold border transition-all ${
+                      className={`py-1.5 px-2 rounded-xl text-[11px] font-semibold border transition-all truncate text-center ${
                         isDisabled
                           ? "opacity-40 cursor-not-allowed bg-slate-100 dark:bg-black/20 text-slate-400 dark:text-white/20 border-transparent"
                           : expiryPreset === preset.id
@@ -539,7 +546,7 @@ export default function ShareVaultModal({ isOpen, onClose, items = [] }) {
 
             {/* Generated Link Result State */}
             {generatedLink && (
-              <div className="mt-3 p-3.5 bg-accent-soft/30 border border-accent-border/40 rounded-2xl space-y-2.5 animate-fade-in shadow-sm">
+              <div className="mt-3 p-3 sm:p-3.5 bg-accent-soft/30 border border-accent-border/40 rounded-2xl space-y-2.5 animate-fade-in shadow-sm">
                 <div className="flex items-center justify-between">
                   <p className="text-[11px] font-bold tracking-widest uppercase text-accent-primary">
                     Relay Link Ready
@@ -552,16 +559,16 @@ export default function ShareVaultModal({ isOpen, onClose, items = [] }) {
                   </button>
                 </div>
 
-                <div className="flex gap-2">
+                <div className="flex flex-col min-[420px]:flex-row gap-2">
                   <input
                     type="text"
                     readOnly
                     value={generatedLink}
-                    className="flex-1 bg-white dark:bg-black/60 border border-slate-200 dark:border-accent-border/30 text-slate-900 dark:text-white font-mono text-xs rounded-xl px-3 py-2 focus:outline-none shadow-sm"
+                    className="flex-1 min-w-0 bg-white dark:bg-black/60 border border-slate-200 dark:border-accent-border/30 text-slate-900 dark:text-white font-mono text-xs rounded-xl px-3 py-2 focus:outline-none shadow-sm break-all"
                   />
                   <button
                     onClick={() => copyToClipboard(generatedLink)}
-                    className="px-3.5 py-2 rounded-xl bg-accent-primary text-accent-foreground text-xs font-bold flex items-center gap-1.5 shadow-sm"
+                    className="px-3.5 py-2 rounded-xl bg-accent-primary text-accent-foreground text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm shrink-0"
                   >
                     {copiedLink ? <Check size={12} /> : <Copy size={12} />}
                     <span>{copiedLink ? "Copied" : "Copy"}</span>

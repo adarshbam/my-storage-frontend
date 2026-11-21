@@ -53,7 +53,12 @@ export default function PlanCard({
         })}`;
 
   const name = plan.type || plan.name || plan.slug || "Vault Storage Plan";
-  const isPopular = plan.popular || name.toLowerCase().includes("pro");
+  const isPopular =
+    plan.isPopular !== undefined
+      ? Boolean(plan.isPopular)
+      : plan.popular !== undefined
+        ? Boolean(plan.popular)
+        : Boolean(plan.tier?.isPopular) || name.toLowerCase().includes("pro");
   const isUltimate = plan.isUltimate || name.toLowerCase().includes("ultimate");
 
   // Determine CTA text & state
@@ -112,9 +117,9 @@ export default function PlanCard({
       layout
       whileHover={{ y: -6 }}
       transition={{ duration: 0.2 }}
-      className={`glass-card-pro relative flex flex-col h-full justify-between rounded-3xl p-6 sm:p-8 transition-all duration-300 ${
+      className={`glass-card-pro relative flex flex-col h-full justify-between rounded-2xl sm:rounded-3xl p-4 min-[360px]:p-5 sm:p-7 transition-all duration-300 min-w-0 w-full ${
         isCurrent
-          ? "border-emerald-500/60 shadow-lg ring-1 ring-emerald-500/30"
+          ? "border-accent-border shadow-lg ring-1 ring-accent-border/50 bg-accent-soft/10"
           : isPaused
             ? "border-amber-500/60 shadow-lg shadow-amber-500/10 ring-1 ring-amber-500/30"
             : isPrevious
@@ -124,50 +129,50 @@ export default function PlanCard({
                 : "hover:border-accent-border hover:shadow-xl hover:shadow-accent-glow/20"
       }`}
     >
-      <div>
+      <div className="min-w-0 w-full">
         {/* Top Badges */}
-        <div className="flex items-center justify-between mb-4 min-h-[28px]">
+        <div className="flex items-center justify-between mb-3 sm:mb-4 min-h-[28px] gap-2 flex-wrap">
           {isPopular && !isCurrent && !isPrevious && !isPaused ? (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-accent-primary text-accent-foreground font-black text-[11px] shadow-accent-glow-sm uppercase tracking-wider">
-              <Sparkles size={12} /> Most Popular
+            <span className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-lg bg-accent-primary text-accent-foreground font-black text-[10px] min-[360px]:text-[11px] shadow-sm uppercase tracking-wider shrink-0">
+              <Sparkles size={11} /> Most Popular
             </span>
           ) : (
             <span />
           )}
           {isCurrent && (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 font-bold text-[11px] uppercase tracking-wider">
-              <ShieldCheck size={12} /> Active Plan
+            <span className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-lg bg-accent-soft border border-accent-border/30 text-accent-primary font-bold text-[10px] min-[360px]:text-[11px] uppercase tracking-wider shrink-0">
+              <ShieldCheck size={11} /> Active Plan
             </span>
           )}
           {isPaused && (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-600 dark:text-amber-400 font-bold text-[11px] uppercase tracking-wider">
-              <PauseCircle size={12} /> Subscription Paused
+            <span className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-600 dark:text-amber-400 font-bold text-[10px] min-[360px]:text-[11px] uppercase tracking-wider shrink-0">
+              <PauseCircle size={11} /> Paused
             </span>
           )}
           {!isCurrent && !isPaused && isPrevious && (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-600 dark:text-amber-400 font-bold text-[11px] uppercase tracking-wider">
-              <RotateCcw size={12} /> Previously Active
+            <span className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-600 dark:text-amber-400 font-bold text-[10px] min-[360px]:text-[11px] uppercase tracking-wider shrink-0">
+              <RotateCcw size={11} /> Previously Active
             </span>
           )}
         </div>
 
         {/* Plan Header */}
-        <div className="mb-6">
-          <h3 className="text-2xl font-black text-slate-900 dark:text-white mb-2 tracking-tight">
+        <div className="mb-4 sm:mb-6 min-w-0">
+          <h3 className="text-lg min-[360px]:text-xl sm:text-2xl font-black text-slate-900 dark:text-white mb-1 tracking-tight break-words">
             {name}
           </h3>
-          <p className="text-slate-500 dark:text-white/50 text-xs font-medium min-h-[32px] leading-relaxed">
+          <p className="text-slate-500 dark:text-white/50 text-[11px] min-[360px]:text-xs font-medium min-h-[30px] leading-relaxed break-words">
             {plan.description ||
               `${formatSize(planStorage)} of high-speed encrypted cloud vault storage.`}
           </p>
         </div>
 
         {/* Pricing Display */}
-        <div className="flex items-baseline gap-2 mb-6 border-b border-slate-100 dark:border-white/10 pb-6">
-          <span className="text-4xl sm:text-5xl font-black text-slate-900 dark:text-white tracking-tight">
+        <div className="flex items-baseline gap-1.5 sm:gap-2 mb-4 sm:mb-6 border-b border-slate-100 dark:border-white/10 pb-4 sm:pb-6 flex-wrap">
+          <span className="text-2xl min-[360px]:text-3xl sm:text-5xl font-black text-slate-900 dark:text-white tracking-tight break-words">
             {formattedPrice}
           </span>
-          <span className="text-slate-500 dark:text-white/40 text-xs font-bold uppercase tracking-wider">
+          <span className="text-slate-500 dark:text-white/40 text-[10px] min-[360px]:text-xs font-bold uppercase tracking-wider shrink-0">
             /{isYearly ? "year" : "month"}
           </span>
         </div>
@@ -258,29 +263,29 @@ export default function PlanCard({
       </div>
 
       {/* CTA Button */}
-      <div className="pt-4 mt-auto">
+      <div className="pt-3 sm:pt-4 mt-auto min-w-0 w-full">
         <button
           onClick={() => !isCurrent && !isStorageExceeded && onSelect && onSelect(plan)}
           disabled={isCurrent || isStorageExceeded || loading}
-          className={`w-full py-3.5 rounded-2xl font-bold text-xs tracking-wider uppercase transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer ${
+          className={`w-full py-2.5 min-[360px]:py-3 sm:py-3.5 px-3 rounded-xl sm:rounded-2xl font-bold text-[11px] min-[360px]:text-xs tracking-wider uppercase transition-all duration-200 flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer ${
             isCurrent
-              ? "bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 cursor-default opacity-80"
+              ? "bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-500 dark:text-white/40 cursor-default font-semibold"
               : isStorageExceeded
                 ? "bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-400 dark:text-white/30 cursor-not-allowed"
                 : isPaused
-                  ? "bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 shadow-lg shadow-emerald-500/20 font-black hover:scale-[1.02] active:scale-[0.98]"
+                  ? "bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-sm font-black active:scale-[0.98]"
                   : isPrevious
-                    ? "bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 shadow-lg shadow-emerald-500/20 font-black hover:scale-[1.02] active:scale-[0.98]"
+                    ? "bg-accent-primary hover:opacity-90 text-accent-foreground shadow-sm font-black active:scale-[0.98]"
                     : isPopular
-                      ? "bg-accent-primary hover:opacity-90 text-accent-foreground shadow-lg shadow-accent-glow/25 hover:scale-[1.02] active:scale-[0.98]"
-                      : "bg-slate-900 dark:bg-white hover:opacity-90 text-white dark:text-slate-900 shadow-md hover:scale-[1.02] active:scale-[0.98]"
+                      ? "bg-accent-primary hover:opacity-90 text-accent-foreground shadow-sm font-black active:scale-[0.98]"
+                      : "bg-slate-900 dark:bg-white hover:opacity-90 text-white dark:text-slate-900 shadow-sm font-bold active:scale-[0.98]"
           }`}
         >
-          {isPaused && !loading && <PlayCircle size={14} className="shrink-0 fill-current" />}
-          {isPrevious && !isPaused && !loading && <RotateCcw size={14} className="shrink-0" />}
-          <span>{loading ? "Processing..." : ctaText}</span>
+          {isPaused && !loading && <PlayCircle size={13} className="shrink-0 fill-current" />}
+          {isPrevious && !isPaused && !loading && <RotateCcw size={13} className="shrink-0" />}
+          <span className="truncate">{loading ? "Processing..." : ctaText}</span>
           {!isCurrent && !isPrevious && !isPaused && !isStorageExceeded && !loading && (
-            <ArrowRight size={15} />
+            <ArrowRight size={14} className="shrink-0" />
           )}
         </button>
       </div>

@@ -68,12 +68,13 @@ import {
   CloudUpload,
 } from "lucide-react";
 
-import { batchDelete } from "../../api/files.api";
+import { batchDelete, recordItemOpened } from "../../api/files.api";
 import { useFiles } from "../../hooks/useFiles";
 import { useSelectionBox } from "../../hooks/useSelectionBox";
 import { useClipboard } from "../../hooks/useClipboard";
 import { useFileOperations } from "../../hooks/useFileOperations";
 import { useContextMenu } from "../../hooks/useContextMenu";
+import { useChamberTransfer } from "../../context/ChamberTransferContext";
 
 import SelectionBox from "./SelectionBox";
 import EmptyState from "./EmptyState";
@@ -100,6 +101,9 @@ import GitActionsWorkflowView from "../git/GitActionsWorkflowView";
 const filePreviewPromise = import("./FilePreviewModal");
 const FilePreviewModal = lazy(() => filePreviewPromise);
 
+// Module-level persistent cache across route transitions for instant 0ms drive navigation
+const globalFolderCache = new Map();
+
 export default function FileBrowser({ specialView }) {
   const params = useParams();
   const folderId = params.folderId;
@@ -124,6 +128,8 @@ export default function FileBrowser({ specialView }) {
     setShowFilters,
   } = useOutletContext();
 
+  const { setActiveDragSource } = useChamberTransfer();
+
   const [data, setData] = useState({ directories: [], files: [] });
   const [loading, setLoading] = useState(true);
   const [dirName, setDirName] = useState("Home");
@@ -138,7 +144,7 @@ export default function FileBrowser({ specialView }) {
   const [error, setError] = useState(null);
   const [isPrivate, setIsPrivate] = useState(false);
   const [detailsItem, setDetailsItem] = useState(null);
-  const folderCache = useRef(new Map());
+  const folderCache = useRef(globalFolderCache);
 
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -162,8 +168,8 @@ export default function FileBrowser({ specialView }) {
     !!searchQuery ||
     !!searchExt ||
     !!searchSize;
-  const { isNoPlan, rules } = usePlan();
-  const planAllowsMutation = !isNoPlan && (rules?.permissions?.allowUpload ?? true);
+  const { isNoPlan, isNoSubscription, rules } = usePlan();
+  const planAllowsMutation = !(isNoPlan || isNoSubscription) && (rules?.permissions?.allowUpload ?? true);
   const isReadOnly =
     specialView === "shared" ||
     specialView === "admin" ||
@@ -251,6 +257,12 @@ export default function FileBrowser({ specialView }) {
   };
 
   const {
+    transferDriveToVault,
+    transferVaultToDrive,
+    clearClipboard,
+  } = useChamberTransfer();
+
+  const {
     clipboard,
     updateClipboard,
     handleCopyItem,
@@ -269,6 +281,8 @@ export default function FileBrowser({ specialView }) {
     driveFolderId,
     githubPath,
     user,
+    transferDriveToVault,
+    transferVaultToDrive,
   });
 
   const [reconnectingDrive, setReconnectingDrive] = useState(false);
@@ -304,6 +318,10 @@ export default function FileBrowser({ specialView }) {
     },
     onError: (err) => {
       console.error("Google Drive connection error:", err);
+      setReconnectingDrive(false);
+    },
+    onNonOAuthError: (err) => {
+      console.error("Google Drive non-OAuth error:", err);
       setReconnectingDrive(false);
     },
   });
@@ -477,6 +495,17 @@ export default function FileBrowser({ specialView }) {
 
   const handlePreview = (file) => {
     setPreviewFile(file);
+    if (file) {
+      recordItemOpened({
+        itemId: file._id || file.id || file.githubPath,
+        provider: file.provider || "local",
+        name: file.name,
+        type: "file",
+        size: file.size || 0,
+        mimeType: file.mimeType || "",
+        githubPath: file.githubPath || "",
+      }).catch(() => {});
+    }
   };
 
   useEffect(() => {
@@ -579,7 +608,9 @@ export default function FileBrowser({ specialView }) {
       }
 
       const response = await fetch(url, { credentials: "include" });
-      if (response.ok) {
+      const contentType = response.headers.get("content-type") || "";
+      const isJson = contentType.includes("application/json");
+      if (response.ok && isJson) {
         if (specialView === "shared" && !folderId) {
           const result = await response.json();
           const dirs = [];
@@ -651,14 +682,16 @@ export default function FileBrowser({ specialView }) {
           files = result.files || [];
         }
 
-        // Hide external integration mount points from administrative eye views
-        if (specialView === "admin" || specialView === "owner") {
+        // Google Drive and GitHub are decoupled into their own dedicated chambers.
+        // Never render external integration mount points as directories inside the Vault chamber root.
+        if (!specialView && !folderId) {
           directories = directories.filter(
             (dir) =>
               dir.provider !== "google_drive" &&
               dir.provider !== "github" &&
               dir.name !== "Google Drive" &&
-              dir.name !== "GitHub",
+              dir.name !== "GitHub" &&
+              dir.name !== "Github",
           );
         }
 
@@ -786,16 +819,16 @@ export default function FileBrowser({ specialView }) {
       ]);
 
       let defaultBranchName = "";
-      if (repoRes.ok) {
-        const repoData = await repoRes.json();
+      if (repoRes.ok && (repoRes.headers.get("content-type") || "").includes("application/json")) {
+        const repoData = await repoRes.json().catch(() => ({}));
         defaultBranchName =
           repoData.details?.default_branch ||
           repoData.default_branch ||
           "";
       }
 
-      if (branchRes.ok) {
-        const branchData = await branchRes.json();
+      if (branchRes.ok && (branchRes.headers.get("content-type") || "").includes("application/json")) {
+        const branchData = await branchRes.json().catch(() => ({}));
         const branchList = Array.isArray(branchData)
           ? branchData
           : branchData.branches || [];
@@ -857,6 +890,14 @@ export default function FileBrowser({ specialView }) {
     specialView,
     selectedBranch,
   ]);
+
+  useEffect(() => {
+    const handleVaultRefresh = () => {
+      fetchFiles(true);
+    };
+    window.addEventListener("vault:refresh", handleVaultRefresh);
+    return () => window.removeEventListener("vault:refresh", handleVaultRefresh);
+  }, [folderId, specialView]);
 
   const handleStarred = async (item) => {
     const type = item.type || (item.extension ? "file" : "directory");
@@ -944,13 +985,16 @@ export default function FileBrowser({ specialView }) {
         });
         setLastSelectedId(item._id);
       }
-    } else {
+    } else if (e && (e.ctrlKey || e.metaKey)) {
       setLastSelectedId(item._id);
       setSelectedItems((prev) =>
         prev.some((i) => i._id === item._id)
           ? prev.filter((i) => i._id !== item._id)
           : [...prev, item],
       );
+    } else {
+      setLastSelectedId(item._id);
+      setSelectedItems([item]);
     }
   };
 
@@ -1254,7 +1298,8 @@ export default function FileBrowser({ specialView }) {
     const ownerParam = targetOwnerId ? `?ownerId=${targetOwnerId}` : "";
 
     if (dir.provider === "google_drive") {
-      if (!isObjectId(dir._id) && dir.name !== "Google Drive") {
+      const isRoot = !dir._id || dir.name === "Google Drive" || dir._id === "google-drive-root";
+      if (!isRoot) {
         // Direct Google Drive subfolder navigation
         navigate(`/dashboard/google-drive/${dir._id}${ownerParam}`);
       } else {
@@ -1262,8 +1307,11 @@ export default function FileBrowser({ specialView }) {
         navigate(`/dashboard/google-drive${ownerParam}`);
       }
     } else if (dir.provider === "github") {
-      if (dir.githubPath) {
-        navigate(`/dashboard/github/${dir.githubPath}${ownerParam}`);
+      const ghPath =
+        dir.githubPath ||
+        (dir.owner && dir.name ? `${dir.owner}/${dir.name}` : (dir.name?.includes("/") ? dir.name : ""));
+      if (ghPath && ghPath !== "github-root") {
+        navigate(`/dashboard/github/${ghPath}${ownerParam}`);
       } else {
         navigate(`/dashboard/github${ownerParam}`);
       }
@@ -1557,21 +1605,30 @@ export default function FileBrowser({ specialView }) {
       return;
     }
 
-    // Ensure type is present for all
+    // Ensure type is present for all and provider is explicitly local
     const preparedItems = itemsToDrag.map((i) => ({
       ...i,
+      provider: "local",
       type: i.type || (i.extension ? "file" : "directory"),
     }));
 
     setActiveDraggedIds(preparedItems.map((i) => i._id));
-    e.dataTransfer.setData("draggedItems", JSON.stringify(preparedItems));
-    e.dataTransfer.setData("draggedItem", JSON.stringify(preparedItems[0]));
-    e.dataTransfer.effectAllowed = "move";
+    setActiveDragSource({ items: preparedItems, provider: "local" });
+    window.__activeVaultDrag = { items: preparedItems, provider: "local" };
+    try {
+      e.dataTransfer.setData("draggedItems", JSON.stringify(preparedItems));
+      e.dataTransfer.setData("draggedItem", JSON.stringify(preparedItems[0]));
+      e.dataTransfer.setData("vault/provider-local", "true");
+      e.dataTransfer.setData("text/plain", JSON.stringify(preparedItems));
+    } catch {}
+    e.dataTransfer.effectAllowed = "all";
   };
 
   const handleDragEnd = () => {
     setActiveDraggedIds([]);
     setDragOverTargetId(null);
+    setActiveDragSource(null);
+    window.__activeVaultDrag = null;
   };
 
   const handleDragOver = (e, targetItem) => {
@@ -1607,7 +1664,12 @@ export default function FileBrowser({ specialView }) {
     e.stopPropagation();
     setDragOverTargetId(null);
     setActiveDraggedIds([]);
-    if (isReadOnly) return;
+    if (isReadOnly) {
+      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        window.dispatchEvent(new CustomEvent("subscription:prompt"));
+      }
+      return;
+    }
 
     // Handle internal DnD FIRST
     const draggedItemsStr = e.dataTransfer.getData("draggedItems");
@@ -1742,28 +1804,32 @@ export default function FileBrowser({ specialView }) {
         if (!targetFolderId || targetFolderId === "root")
           targetFolderId = user?.rootDirId;
 
-        try {
-          await fetch(`${SERVER_URL}/drive/transfer-to-vault${ownerParam}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              items: itemsToMove
-                .filter((i) => i.provider === "google_drive")
-                .map((i) => ({
+        const driveItems = itemsToMove.filter((i) => i.provider === "google_drive");
+        if (transferDriveToVault) {
+          await transferDriveToVault(driveItems, targetFolderId);
+        } else {
+          try {
+            await fetch(`${SERVER_URL}/drive/transfer-to-vault${ownerParam}`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                items: driveItems.map((i) => ({
                   _id: i._id || i.id,
                   name: i.name,
                   mimeType: i.mimeType || "application/octet-stream",
                   type: i.type,
                 })),
-              targetFolderId: targetFolderId,
-            }),
-            credentials: "include",
-          });
-          fetchFiles();
-          setSelectedItems([]);
-        } catch (err) {
-          console.error("Transfer to Vault failed", err);
+                targetFolderId: targetFolderId,
+                action: "move",
+              }),
+              credentials: "include",
+            });
+          } catch (err) {
+            console.error("Transfer to Vault failed", err);
+          }
         }
+        fetchFiles();
+        setSelectedItems([]);
         return;
       }
 
@@ -1773,37 +1839,33 @@ export default function FileBrowser({ specialView }) {
         if (!targetDriveFolderId || isObjectId(targetDriveFolderId))
           targetDriveFolderId = "root";
 
-        try {
-          const localItems = itemsToMove
-            .filter((i) => !i.provider || i.provider === "local");
-          const res = await fetch(`${SERVER_URL}/drive/transfer-from-vault${ownerParam}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              items: localItems.map((i) => ({
-                _id: i._id || i.id,
-                name: i.name,
-                extension: i.extension,
-                size: i.size,
-                type: i.type,
-              })),
-              targetDriveFolderId: targetDriveFolderId,
-            }),
-            credentials: "include",
-          });
-          if (res.ok && localItems.length > 0) {
-            await batchDelete(
-              localItems.map((i) => ({
-                _id: i._id || i.id,
-                type: i.type || (i.extension ? "file" : "directory"),
-              }))
-            ).catch(() => {});
+        const localItems = itemsToMove.filter((i) => !i.provider || i.provider === "local");
+        if (transferVaultToDrive) {
+          await transferVaultToDrive(localItems, targetDriveFolderId);
+        } else {
+          try {
+            await fetch(`${SERVER_URL}/drive/transfer-from-vault${ownerParam}`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                items: localItems.map((i) => ({
+                  _id: i._id || i.id,
+                  name: i.name,
+                  extension: i.extension,
+                  size: i.size,
+                  type: i.type,
+                })),
+                targetDriveFolderId: targetDriveFolderId,
+                action: "move",
+              }),
+              credentials: "include",
+            });
+          } catch (err) {
+            console.error("Transfer from Vault failed", err);
           }
-          fetchFiles();
-          setSelectedItems([]);
-        } catch (err) {
-          console.error("Transfer from Vault failed", err);
         }
+        fetchFiles();
+        setSelectedItems([]);
         return;
       }
 
@@ -1892,7 +1954,12 @@ export default function FileBrowser({ specialView }) {
   const handleZoneDrop = (e) => {
     e.preventDefault();
     e.stopPropagation();
-    if (isReadOnly) return;
+    if (isReadOnly) {
+      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        window.dispatchEvent(new CustomEvent("subscription:prompt"));
+      }
+      return;
+    }
 
     // Check if it's an internal drag landing in the empty zone
     const draggedItemsStr = e.dataTransfer.getData("draggedItems");
@@ -1942,7 +2009,7 @@ export default function FileBrowser({ specialView }) {
 
   return (
     <div
-      className="flex-1 flex flex-col relative"
+      className="flex-1 min-w-0 w-full flex flex-col relative"
       onDrop={handleZoneDrop}
       onDragOver={handleZoneDragOver}
     >
@@ -1950,6 +2017,7 @@ export default function FileBrowser({ specialView }) {
       <div className="flex flex-wrap items-center justify-between gap-y-3 gap-x-2 pb-4 mb-4 border-b border-white/5 shrink-0 px-1 sm:px-2">
         <div className="flex items-center gap-2 min-w-0 max-w-full flex-wrap">
           {(data.parentDir ||
+            folderId ||
             (specialView === "shared" && folderId) ||
             specialView === "admin" ||
             specialView === "owner" ||
@@ -1990,10 +2058,10 @@ export default function FileBrowser({ specialView }) {
                       `/dashboard/github/${parts.slice(0, -1).join("/")}`,
                     );
                   }
-                } else if (data.parentDir === user?.rootDirId) {
-                  navigate("/dashboard");
-                } else {
+                } else if (data.parentDir && data.parentDir !== user?.rootDirId) {
                   navigate(`/dashboard/folder/${data.parentDir}`);
+                } else {
+                  navigate("/dashboard");
                 }
               }}
               onDrop={(e) => {
@@ -2047,7 +2115,7 @@ export default function FileBrowser({ specialView }) {
               </svg>
             </button>
           )}
-          <div className="flex items-center flex-wrap gap-1 text-lg sm:text-xl md:text-2xl font-bold text-slate-900 dark:text-white tracking-tight min-w-0">
+          <div className="flex items-center flex-wrap gap-1 text-base min-[360px]:text-lg sm:text-xl md:text-2xl font-bold text-slate-900 dark:text-white tracking-tight min-w-0">
             {breadcrumbs.map((crumb, idx) => {
               const isLast = idx === breadcrumbs.length - 1;
               return (
@@ -2058,7 +2126,7 @@ export default function FileBrowser({ specialView }) {
                     </span>
                   )}
                   {isLast ? (
-                    <span className="text-slate-900 dark:text-white font-black capitalize truncate max-w-[150px] sm:max-w-[280px] select-none">
+                    <span className="text-slate-900 dark:text-white font-black capitalize truncate max-w-[120px] min-[360px]:max-w-[160px] sm:max-w-[280px] select-none">
                       {crumb.label}
                     </span>
                   ) : (
@@ -2178,13 +2246,13 @@ export default function FileBrowser({ specialView }) {
             </div>
           )}
 
-          <div className="flex items-center bg-black/40 backdrop-blur-sm rounded-xl p-1 border border-white/5">
+          <div className="flex items-center bg-slate-100 dark:bg-white/[0.06] rounded-xl p-1 border border-slate-200 dark:border-white/10">
             <button
               onClick={() => setViewMode("grid")}
-              className={`p-1.5 rounded-md transition-colors ${
+              className={`p-1.5 rounded-lg transition-all ${
                 viewMode === "grid"
-                  ? "bg-white/10 shadow-sm text-vault-emerald"
-                  : "text-white/40 hover:text-white/80"
+                  ? "bg-white dark:bg-white/15 shadow-sm text-slate-900 dark:text-white font-medium"
+                  : "text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200"
               }`}
               title="Grid view"
             >
@@ -2192,10 +2260,10 @@ export default function FileBrowser({ specialView }) {
             </button>
             <button
               onClick={() => setViewMode("list")}
-              className={`p-1.5 rounded-md transition-colors ${
+              className={`p-1.5 rounded-lg transition-all ${
                 viewMode === "list"
-                  ? "bg-white/10 shadow-sm text-vault-emerald"
-                  : "text-white/40 hover:text-white/80"
+                  ? "bg-white dark:bg-white/15 shadow-sm text-slate-900 dark:text-white font-medium"
+                  : "text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200"
               }`}
               title="List view"
             >
@@ -2207,7 +2275,7 @@ export default function FileBrowser({ specialView }) {
 
       {/* ── GIT REPOSITORY WORKSPACE TABS ── */}
       {specialView === "github-repo" && (
-        <div className="flex items-center gap-1.5 p-1 bg-white/40 dark:bg-[#111113]/60 backdrop-blur-md border border-slate-200 dark:border-white/5 rounded-2xl mb-4 overflow-x-auto custom-scrollbar">
+        <div className="shrink-0 flex items-center gap-1.5 p-1.5 bg-white/40 dark:bg-[#111113]/60 backdrop-blur-md border border-slate-200 dark:border-white/5 rounded-2xl mb-4 overflow-x-auto custom-scrollbar">
           {[
             { id: "files", label: "Files", icon: Folder, count: data.files.length + data.directories.length },
             { id: "commits", label: "Commits", icon: GitCommit },
@@ -2390,13 +2458,13 @@ export default function FileBrowser({ specialView }) {
             data-tour="file-grid"
             className={`pb-20 relative select-none flex-1 content-start ${
               viewMode === "list"
-                ? "flex flex-col gap-1"
-                : "grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] sm:grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3 sm:gap-6 p-3 sm:p-6 rounded-2xl sm:rounded-[2.5rem] vault-glass-panel"
+                ? "flex flex-col gap-2 p-1 sm:p-2"
+                : "grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] sm:grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-4 sm:gap-6 p-4 sm:p-6 rounded-2xl sm:rounded-[2.5rem] vault-glass-panel"
             }`}
             onMouseDown={handleMouseDown}
           >
             {viewMode === "list" && (
-              <div className="grid grid-cols-[1fr,40px] sm:grid-cols-[1fr,100px,40px] md:grid-cols-[1fr,100px,150px,40px] gap-2 sm:gap-4 px-3 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold text-slate-500 border-b border-slate-200/50 dark:border-slate-800/50 mb-2 items-center sticky top-0 bg-transparent z-10">
+              <div className="grid grid-cols-[1fr,40px] sm:grid-cols-[1fr,100px,40px] md:grid-cols-[1fr,100px,150px,40px] gap-2 sm:gap-4 px-2 min-[360px]:px-4 py-2 sm:py-3 text-xs sm:text-sm font-semibold text-slate-500 border-b border-slate-200/50 dark:border-slate-800/50 mb-2 items-center sticky top-0 bg-transparent z-10 min-w-0 w-full">
                 <div>Name</div>
                 <div className="text-right hidden sm:block">Size</div>
                 <div className="text-right pr-4 hidden md:block">Modified</div>
@@ -2415,6 +2483,12 @@ export default function FileBrowser({ specialView }) {
                   height: selectionBox.height,
                 }}
               />
+            )}
+
+            {data.directories.length > 0 && data.files.length > 0 && (
+              <div className="col-span-full text-xs font-bold text-slate-400 dark:text-white/40 uppercase tracking-wider mb-1 mt-1">
+                Folders ({data.directories.length})
+              </div>
             )}
 
             {data.directories.map((dir) => (
@@ -2466,6 +2540,13 @@ export default function FileBrowser({ specialView }) {
                 }}
               />
             ))}
+
+            {data.directories.length > 0 && data.files.length > 0 && (
+              <div className="col-span-full text-xs font-bold text-slate-400 dark:text-white/40 uppercase tracking-wider mb-1 mt-6 sm:mt-8 border-t border-slate-200/40 dark:border-white/5 pt-4 sm:pt-6">
+                Files ({data.files.length})
+              </div>
+            )}
+
             {data.files.map((file) => (
               <AssetCard
                 id={`file-card-${file._id}`}
@@ -2511,12 +2592,12 @@ export default function FileBrowser({ specialView }) {
           ))}
 
           {data.directories.length === 0 && data.files.length === 0 && (
-            <div className="col-span-full flex flex-col items-center justify-center py-20 text-slate-400">
+            <div className="col-span-full flex flex-col items-center justify-center py-12 sm:py-20 px-3 min-[360px]:px-4 text-center text-slate-400 max-w-full">
               {specialView ? (
                 <>
                   <div
                     className={cn(
-                      "p-6 rounded-full mb-4 shadow-lg text-white/40 border border-white/5 bg-white/[0.02]",
+                      "p-4 min-[360px]:p-5 sm:p-6 rounded-full mb-3 sm:mb-4 shadow-lg text-white/40 border border-white/5 bg-white/[0.02]",
                       specialView === "shared" &&
                         "shadow-[0_0_30px_rgba(155,77,255,0.15)] text-relay-accent/80 border-relay-accent/20",
                       specialView === "recent" &&
@@ -2526,16 +2607,16 @@ export default function FileBrowser({ specialView }) {
                     )}
                   >
                     {specialView === "shared" ? (
-                      <Share2 size={40} />
+                      <Share2 size={32} className="sm:w-10 sm:h-10" />
                     ) : specialView === "recent" ? (
-                      <Clock size={40} />
+                      <Clock size={32} className="sm:w-10 sm:h-10" />
                     ) : specialView === "starred" ? (
-                      <Star size={40} />
+                      <Star size={32} className="sm:w-10 sm:h-10" />
                     ) : (
-                      <Upload size={40} />
+                      <Upload size={32} className="sm:w-10 sm:h-10" />
                     )}
                   </div>
-                  <p className="text-lg font-medium mb-2">
+                  <p className="text-base min-[360px]:text-lg font-bold mb-1.5 text-slate-800 dark:text-white">
                     {isSearch
                       ? "No search results found"
                       : specialView === "shared"
@@ -2547,7 +2628,7 @@ export default function FileBrowser({ specialView }) {
                             : "No files yet"}
                   </p>
                   {!isSearch && (
-                    <p className="text-sm text-white/40 max-w-sm text-center">
+                    <p className="text-xs min-[360px]:text-sm text-slate-500 dark:text-white/40 max-w-xs sm:max-w-sm text-center leading-relaxed">
                       {specialView === "shared"
                         ? "Shared access vaults from other nodes will appear here once authenticated."
                         : specialView === "recent"
@@ -2567,9 +2648,9 @@ export default function FileBrowser({ specialView }) {
                           "# New Repository\n\nThis is an empty repository.",
                         );
                       }}
-                      className="mt-4 px-6 py-2 bg-gradient-to-r from-[#14b8a6] to-[#3b82f6] text-white rounded-xl hover:shadow-[0_0_20px_rgba(20,184,166,0.3)] transition-all duration-300 flex items-center gap-2"
+                      className="mt-4 px-4 min-[360px]:px-6 py-2 bg-gradient-to-r from-[#14b8a6] to-[#3b82f6] text-white rounded-xl hover:shadow-[0_0_20px_rgba(20,184,166,0.3)] transition-all duration-300 flex items-center gap-2 text-xs sm:text-sm font-bold"
                     >
-                      <Plus size={18} />
+                      <Plus size={16} />
                       Initialize with README.md
                     </button>
                   )}
@@ -2577,17 +2658,17 @@ export default function FileBrowser({ specialView }) {
               ) : (
                 <>
                   <div
-                    className="bg-white/40 dark:bg-white/[0.03] p-6 rounded-full mb-4 cursor-pointer hover:bg-white/60 dark:hover:bg-white/[0.06] transition-all duration-300 shadow-[0_0_30px_rgba(20,184,166,0.06)] dark:shadow-[0_0_30px_rgba(20,184,166,0.1)]"
+                    className="bg-white/40 dark:bg-white/[0.03] p-4 min-[360px]:p-5 sm:p-6 rounded-full mb-3 sm:mb-4 cursor-pointer hover:bg-white/60 dark:hover:bg-white/[0.06] transition-all duration-300 shadow-[0_0_30px_rgba(20,184,166,0.06)] dark:shadow-[0_0_30px_rgba(20,184,166,0.1)]"
                     onClick={openUploadModal}
                   >
-                    <Upload size={40} />
+                    <Upload size={32} className="sm:w-10 sm:h-10 text-accent-primary" />
                   </div>
-                  <p className="text-lg font-medium mb-2">
+                  <p className="text-base min-[360px]:text-lg font-bold mb-1.5 text-slate-800 dark:text-white">
                     {isSearch
                       ? "No search results found"
                       : "This folder is empty"}
                   </p>
-                  <p className="text-sm">
+                  <p className="text-xs min-[360px]:text-sm text-slate-500 dark:text-white/40 max-w-xs sm:max-w-sm text-center leading-relaxed">
                     {isSearch
                       ? "Try adjusting your search query"
                       : "Drag and drop files here or use the upload button"}
@@ -2634,7 +2715,7 @@ export default function FileBrowser({ specialView }) {
             className="flex items-center gap-2 text-slate-700 dark:text-slate-200 hover:text-black dark:hover:text-white transition-colors font-medium text-sm"
             title="Bulk Share"
           >
-            <Share2 size={16} className="text-purple-400" /> Share
+            <Share2 size={16} className="text-accent-primary" /> Share
           </button>
           {selectedItems.some((i) => !isSpecialFolder(i, specialView)) && (
             <>

@@ -356,12 +356,15 @@ export default function ProfileMenu({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: 8 }}
             transition={{ duration: 0.18, ease: "easeOut" }}
-            className="absolute right-0 top-[calc(100%+12px)] w-[calc(100vw-24px)] max-w-[340px] origin-top-right"
+            className="fixed top-16 inset-x-3 sm:inset-auto sm:absolute sm:right-0 sm:top-[calc(100%+12px)] w-auto sm:w-[340px] max-w-[340px] ml-auto origin-top-right"
             style={{ zIndex: 9999 }}
           >
-            <div className="rounded-3xl overflow-hidden bg-white/95 dark:bg-vault-surface/95 text-slate-900 dark:text-white backdrop-blur-2xl border border-slate-200 dark:border-white/10 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.4)]">
+            <div className="rounded-3xl overflow-hidden bg-white/95 dark:bg-vault-surface/95 text-slate-900 dark:text-white backdrop-blur-2xl border border-slate-200 dark:border-white/10 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.4)] relative">
+              {/* Subtle Ambient Top Theme Aura (matches Homepage atmosphere) */}
+              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-[140px] bg-[radial-gradient(ellipse_at_top,rgba(var(--accent-primary-rgb),0.14)_0%,transparent_70%)] pointer-events-none rounded-t-3xl z-0" />
+
               {/* Header Profile Section */}
-              <div className="p-5 pb-4 border-b border-slate-100 dark:border-white/5">
+              <div className="p-5 pb-4 border-b border-slate-100 dark:border-white/5 relative z-10">
                 <div className="flex items-center gap-3.5">
                   <div
                     className="relative group/avatar cursor-pointer shrink-0"
@@ -515,18 +518,21 @@ export default function ProfileMenu({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: 8 }}
             transition={{ duration: 0.18, ease: "easeOut" }}
-            className="absolute right-0 top-[calc(100%+12px)] w-[calc(100vw-24px)] max-w-[340px] origin-top-right"
+            className="fixed top-16 inset-x-3 sm:inset-auto sm:absolute sm:right-0 sm:top-[calc(100%+12px)] w-auto sm:w-[340px] max-w-[340px] ml-auto origin-top-right"
             style={{ zIndex: 9999 }}
           >
-            <div className="rounded-3xl overflow-hidden bg-white/95 dark:bg-[#121614]/95 text-slate-900 dark:text-white backdrop-blur-2xl border border-slate-200 dark:border-white/10 shadow-[0_25px_70px_-15px_rgba(0,0,0,0.6)] flex flex-col max-h-[85vh]">
+            <div className="rounded-3xl overflow-hidden bg-white/95 dark:bg-vault-surface/95 text-slate-900 dark:text-white backdrop-blur-2xl border border-slate-200 dark:border-white/10 shadow-[0_25px_70px_-15px_rgba(0,0,0,0.6)] flex flex-col max-h-[85vh] relative">
+              {/* Subtle Ambient Top Theme Aura (matches Homepage atmosphere) */}
+              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-[140px] bg-[radial-gradient(ellipse_at_top,rgba(var(--accent-primary-rgb),0.14)_0%,transparent_70%)] pointer-events-none rounded-t-3xl z-0" />
+
               {/* Header */}
-              <div className="p-4.5 px-5 border-b border-slate-100 dark:border-white/5 flex items-center justify-between">
+              <div className="p-4.5 px-5 border-b border-slate-100 dark:border-white/5 flex items-center justify-between relative z-10">
                 <div>
                   <h3 className="text-sm font-bold text-slate-900 dark:text-white tracking-tight">
                     Color theme
                   </h3>
                   <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                    11 curated presets in Dark & Light
+                    {palettes.length} curated presets in Dark & Light
                   </p>
                 </div>
                 <button
